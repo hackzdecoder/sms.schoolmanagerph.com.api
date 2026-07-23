@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Log;
 class PushDeviceController extends Controller
 {
     /**
-     * Register a new device for push notifications
+     * Register a new device for push notifications.
+     * Enforces one-to-one: only the latest device per user receives notifications.
      */
     public function registerDevice(Request $request)
     {
@@ -32,13 +33,35 @@ class PushDeviceController extends Controller
             $userId = $authUser->user_id;
             $schoolCode = $authUser->school_code;
 
-            // Check if device already exists
+            // ─── STEP 1: Deactivate ALL existing devices for this user ───
+            // This ensures only the latest device receives push notifications (1:1 relationship).
+            DB::connection('users_main')->table('push_devices')
+                ->where('user_id', $userId)
+                ->where('school_code', $schoolCode)
+                ->update([
+                    'is_active' => false,
+                    'updated_at' => now()
+                ]);
+
+            Log::info("PushDevice: Deactivated all previous devices for user {$userId} (school: {$schoolCode})");
+
+            // ─── STEP 2: Also reassign any device that had this player_id under a different user ───
+            // This handles the case where a shared/reused device switches accounts.
+            DB::connection('users_main')->table('push_devices')
+                ->where('player_id', $request->player_id)
+                ->where('user_id', '!=', $userId)
+                ->update([
+                    'is_active' => false,
+                    'updated_at' => now()
+                ]);
+
+            // ─── STEP 3: Upsert the current device as the only active one ───
             $existing = DB::connection('users_main')->table('push_devices')
                 ->where('player_id', $request->player_id)
                 ->first();
 
             if ($existing) {
-                // Update existing device
+                // Update existing device record
                 DB::connection('users_main')->table('push_devices')
                     ->where('id', $existing->id)
                     ->update([
@@ -49,7 +72,7 @@ class PushDeviceController extends Controller
                         'updated_at' => now()
                     ]);
             } else {
-                // Insert new device
+                // Insert new device record
                 DB::connection('users_main')->table('push_devices')->insert([
                     'user_id' => $userId,
                     'school_code' => $schoolCode,
@@ -60,6 +83,8 @@ class PushDeviceController extends Controller
                     'updated_at' => now()
                 ]);
             }
+
+            Log::info("PushDevice: Registered device for user {$userId} (player_id: {$request->player_id})");
 
             return response()->json([
                 'success' => true,

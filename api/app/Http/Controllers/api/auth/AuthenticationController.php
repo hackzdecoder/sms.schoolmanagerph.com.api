@@ -624,7 +624,19 @@ class AuthenticationController extends Controller
    */
   public function logout(Request $request)
   {
-    $request->user()->currentAccessToken()->delete();
+    $user = $request->user();
+
+    // Deactivate all push devices for this user so they stop receiving notifications
+    if ($user && $user->user_id) {
+      DB::connection('users_main')->table('push_devices')
+        ->where('user_id', $user->user_id)
+        ->update([
+          'is_active' => false,
+          'updated_at' => now()
+        ]);
+    }
+
+    $user->currentAccessToken()->delete();
 
     return response()->json([
       'message' => 'Logged out successfully.',
