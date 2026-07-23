@@ -66,7 +66,8 @@ class CheckAndNotifyUnread extends Command
                     $userId = $userDevice->user_id;
 
                     // --- Check for new unread ATTENDANCE records ---
-                    $totalNotificationsSent += $this->checkAttendance($schoolDb, $userId, $schoolCode);
+                    // Excluded as per requirement: only send notifications for messages, not attendance.
+                    // $totalNotificationsSent += $this->checkAttendance($schoolDb, $userId, $schoolCode);
 
                     // --- Check for new unread MESSAGES ---
                     $totalNotificationsSent += $this->checkMessages($schoolDb, $userId, $schoolCode, $schoolName);
