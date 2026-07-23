@@ -59,7 +59,7 @@ class NotificationService
         try {
             $payload = [
                 'app_id' => $appId,
-                'include_subscription_ids' => $subscriptionIds,
+                'include_player_ids' => $subscriptionIds,
                 'headings' => ['en' => $title],
                 'contents' => ['en' => $message],
                 'data' => $data,
