@@ -22,7 +22,8 @@ return [
   'allowed_origins' => [
     'http://localhost:3039',
     'https://staging-sms.schoolmanagerph.com',
-    'https://production-sms.schoolmanagerph.com'
+    'https://production-sms.schoolmanagerph.com',
+    'https://sms.schoolmanagerph.com/login'
   ],
 
   'allowed_origins_patterns' => [],
