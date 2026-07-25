@@ -261,6 +261,15 @@ class AuthenticationController extends Controller
     $userModelInstance->tokens()->delete();
     $authToken = $userModelInstance->createToken('auth_token')->plainTextToken;
 
+    // Delete previous push devices and notification logs upon login so only this latest login receives notifications
+    DB::connection('users_main')->table('push_devices')
+      ->where('user_id', $userRecord->user_id)
+      ->delete();
+
+    DB::connection('users_main')->table('notification_logs')
+      ->where('user_id', $userRecord->user_id)
+      ->delete();
+
     $currentTimestamp = Carbon::now();
     DB::connection('users_main')
       ->table('users')
@@ -626,14 +635,11 @@ class AuthenticationController extends Controller
   {
     $user = $request->user();
 
-    // Deactivate all push devices for this user so they stop receiving notifications
+    // Delete all push devices for this user on logout so they stop receiving notifications
     if ($user && $user->user_id) {
       DB::connection('users_main')->table('push_devices')
         ->where('user_id', $user->user_id)
-        ->update([
-          'is_active' => false,
-          'updated_at' => now()
-        ]);
+        ->delete();
     }
 
     $user->currentAccessToken()->delete();
