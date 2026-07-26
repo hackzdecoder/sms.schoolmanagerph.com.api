@@ -261,12 +261,9 @@ class AuthenticationController extends Controller
     $userModelInstance->tokens()->delete();
     $authToken = $userModelInstance->createToken('auth_token')->plainTextToken;
 
-    // Delete previous push devices and notification logs upon login so only this latest login receives notifications
+    // Delete previous push devices upon login so only the latest device receives notifications
+    // NOTE: We keep notification_logs intact so already-notified messages are NOT re-sent.
     DB::connection('users_main')->table('push_devices')
-      ->where('user_id', $userRecord->user_id)
-      ->delete();
-
-    DB::connection('users_main')->table('notification_logs')
       ->where('user_id', $userRecord->user_id)
       ->delete();
 

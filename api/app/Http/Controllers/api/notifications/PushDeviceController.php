@@ -33,18 +33,14 @@ class PushDeviceController extends Controller
             $userId = $authUser->user_id;
             $schoolCode = $authUser->school_code;
 
-            // ─── STEP 1: Delete previous device records and notification logs for this user ───
-            // This ensures only the latest device receives push notifications (1:1 relationship)
-            // and clears old logs so any unread notifications can be pushed to the latest login.
+            // ─── STEP 1: Delete previous device records for this user ───
+            // This ensures only the latest device receives push notifications (1:1 relationship).
+            // NOTE: We keep notification_logs intact so already-notified messages are NOT re-sent.
             DB::connection('users_main')->table('push_devices')
                 ->where('user_id', $userId)
                 ->delete();
 
-            DB::connection('users_main')->table('notification_logs')
-                ->where('user_id', $userId)
-                ->delete();
-
-            Log::info("PushDevice: Deleted previous devices and notification logs for user {$userId}");
+            Log::info("PushDevice: Deleted previous devices for user {$userId}");
 
             // ─── STEP 2: Also remove any existing record tied to this player_id from previous logins ───
             DB::connection('users_main')->table('push_devices')
