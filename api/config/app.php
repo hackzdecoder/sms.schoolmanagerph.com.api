@@ -64,7 +64,19 @@ return [
     |
     */
 
-    'frontend_url' => env('FRONTEND_URL', 'http://localhost:3039'),
+    'frontend_url' => env('FRONTEND_URL', function () {
+        $env = env('APP_ENV', 'dev');
+        
+        switch ($env) {
+            case 'production':
+                return 'https://sms.schoolmanagerph.com';
+            case 'staging':
+                return 'https://sms-staging.schoolmanagerph.com';
+            case 'dev':
+            default:
+                return 'http://localhost:3039';
+        }
+    }),
 
     /*
     |--------------------------------------------------------------------------
