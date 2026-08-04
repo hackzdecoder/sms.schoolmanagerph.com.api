@@ -23,7 +23,8 @@ return [
     'http://localhost:3039',
     'https://staging-sms.schoolmanagerph.com',
     'https://production-sms.schoolmanagerph.com',
-    'https://sms.schoolmanagerph.com'
+    'https://sms.schoolmanagerph.com',
+    'https://sms-staging.schoolmanagerph.com',
   ],
 
   'allowed_origins_patterns' => [],
