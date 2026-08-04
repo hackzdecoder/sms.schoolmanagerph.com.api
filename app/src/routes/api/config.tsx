@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // Base URL configuration
-// const API_BASE_URL = 'http://localhost:8001/api';
+// const API_BASE_URL = 'http://localhost:8000/api';
 // const API_BASE_URL = 'https://production-sms.schoolmanagerph.com/api';
 const API_BASE_URL = 'https://sms.schoolmanagerph.com/api';
 
