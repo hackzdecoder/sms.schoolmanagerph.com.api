@@ -200,203 +200,233 @@ class EmailController extends Controller
           ],
       ], 200);
   }
-
+  
   public function resetPasswordRequestLvlTwo(Request $request)
   {
-    $request->merge(['username' => trim($request->username)]);
+      $request->merge([
+          'username' => trim($request->username),
+          'school_code' => trim($request->school_code ?? ''),
+      ]);
 
-    $validator = Validator::make($request->all(), [
-      'username' => 'required|string|exists:users,username',
-    ], [
-      'username.required' => 'Username is required.',
-      'username.exists' => 'Username not found in our records.',
-    ]);
+      $validator = Validator::make($request->all(), [
+          'username' => 'required|string',
+          'school_code' => 'required|string',
+      ], [
+          'username.required' => 'Username is required.',
+          'school_code.required' => 'School code is required.',
+      ]);
 
-    if ($validator->fails()) {
-      return response()->json([
-        'success' => false,
-        'status' => 422,
-        'message' => 'Validation failed.',
-        'errors' => $validator->errors(),
-      ], 422);
-    }
-
-    $user = User::where('username', $request->username)->first();
-
-    if ($user->account_status !== 'active') {
-      return response()->json([
-        'success' => false,
-        'status' => 403,
-        'message' => 'Your account has been deactivated',
-        'account_status' => $user->account_status,
-      ], 403);
-    }
-
-    // NEW: Email validation - check if user has an email registered
-    if (empty($user->email)) {
-      return response()->json([
-        'success' => false,
-        'status' => 400,
-        'message' => 'This account does not have a registered email',
-      ], 400);
-    }
-
-    if (empty($user->assigned_admin_email)) {
-      return response()->json([
-        'success' => false,
-        'status' => 400,
-        'message' => 'No assigned admin email found for this user. Please contact support.',
-      ], 400);
-    }
-
-    // FIXED: Get school code for this specific user
-    $fullName = $user->username; // Default fallback
-
-    // Try to get school code from user record
-    $schoolCode = $user->school_code ?? null;
-
-    // If no school code in database, extract from username or user_id
-    if (!$schoolCode) {
-      // Pattern: schoolcode_username (e.g., wlkae_sagara_kyosuke)
-      if (preg_match('/^([a-z]{2,5})_/i', $user->username ?? '', $schoolCodeMatches)) {
-        $schoolCode = strtolower($schoolCodeMatches[1]);
+      if ($validator->fails()) {
+          return response()->json([
+              'success' => false,
+              'status' => 422,
+              'message' => 'Validation failed.',
+              'errors' => $validator->errors(),
+          ], 422);
       }
-      // Alternative: Extract from beginning of user_id
-      else if (preg_match('/^([a-z]{2,5})/i', $user->user_id ?? '', $schoolCodeMatches)) {
-        $schoolCode = strtolower($schoolCodeMatches[1]);
-      }
-    } else {
-      $schoolCode = strtolower(trim($schoolCode));
-    }
 
-    // If school code is found, try to fetch student profile
-    if ($schoolCode) {
-      try {
-        // Generate appropriate database name based on environment
-        $targetDatabaseName = DatabaseManager::generateDatabaseName($schoolCode);
-
-        // Connect to the school-specific database
-        $schoolDatabaseConnection = DatabaseManager::connect($targetDatabaseName);
-
-        // Retrieve student record including fullname
-        $studentProfile = $schoolDatabaseConnection
-          ->table('student_records')
-          ->where('user_id', $user->user_id)
+      // ✅ Find user with BOTH username AND school_code
+      $user = User::where('username', $request->username)
+          ->where('school_code', $request->school_code)
           ->first();
 
-        // If student record exists, extract the full name
-        if ($studentProfile) {
-          // Try multiple possible column names for full name
-          if (isset($studentProfile->fullname) && !empty($studentProfile->fullname)) {
-            $fullName = $studentProfile->fullname;
-          } elseif (isset($studentProfile->full_name) && !empty($studentProfile->full_name)) {
-            $fullName = $studentProfile->full_name;
-          } elseif (isset($studentProfile->name) && !empty($studentProfile->name)) {
-            $fullName = $studentProfile->name;
-          } elseif (isset($studentProfile->student_name) && !empty($studentProfile->student_name)) {
-            $fullName = $studentProfile->student_name;
-          }
-
-          Log::info('Successfully fetched student profile for full name', [
-            'user_id' => $user->user_id,
-            'school_code' => $schoolCode,
-            'fullname_found' => $fullName
-          ]);
-        } else {
-          Log::warning('No student profile found for user', [
-            'user_id' => $user->user_id,
-            'school_code' => $schoolCode,
-            'database' => $targetDatabaseName
-          ]);
-        }
-
-        // Clean up database connection
-        DatabaseManager::disconnect($targetDatabaseName);
-
-      } catch (\Exception $e) {
-        $fullName = $user->username;
-        Log::error('Could not fetch student profile, using username as fallback', [
-          'user_id' => $user->id,
-          'school_code' => $schoolCode,
-          'error' => $e->getMessage(),
-          'trace' => $e->getTraceAsString()
-        ]);
+      if (!$user) {
+          return response()->json([
+              'success' => false,
+              'status' => 404,
+              'message' => 'User not found for this school.',
+          ], 404);
       }
-    } else {
-      Log::warning('Could not determine school code for user', [
-        'user_id' => $user->id,
-        'username' => $user->username,
-        'user_school_code' => $user->school_code
+
+      if ($user->account_status !== 'active') {
+          return response()->json([
+              'success' => false,
+              'status' => 403,
+              'message' => 'Your account has been deactivated',
+              'account_status' => $user->account_status,
+          ], 403);
+      }
+
+      if (empty($user->email)) {
+          return response()->json([
+              'success' => false,
+              'status' => 400,
+              'message' => 'This account does not have a registered email',
+          ], 400);
+      }
+
+      if (empty($user->assigned_admin_email)) {
+          return response()->json([
+              'success' => false,
+              'status' => 400,
+              'message' => 'No assigned admin email found for this user. Please contact support.',
+          ], 400);
+      }
+
+      // ✅ Get full name from student_records
+      $fullName = $user->username; // Default fallback
+      $schoolCode = $user->school_code ?? null;
+
+      Log::info('Fetching student profile for user', [
+          'user_id' => $user->user_id,
+          'username' => $user->username,
+          'school_code' => $schoolCode
       ]);
-    }
 
-    $userEmail = $user->email ?? 'Not specified';
-    $currentDateTime = Carbon::now()->format('F j, Y \a\t g:i A');
-    $expiryDateTime = Carbon::now()->addHours(24)->format('F j, Y \a\t g:i A');
-    $adminResetToken = Str::random(60);
+      if (!$schoolCode) {
+          // Try to extract school code from username or user_id
+          if (preg_match('/^([a-z]{2,5})_/i', $user->username ?? '', $schoolCodeMatches)) {
+              $schoolCode = strtolower($schoolCodeMatches[1]);
+          } else if (preg_match('/^([a-z]{2,5})/i', $user->user_id ?? '', $schoolCodeMatches)) {
+              $schoolCode = strtolower($schoolCodeMatches[1]);
+          }
+      } else {
+          $schoolCode = strtolower(trim($schoolCode));
+      }
 
-    DB::table('users')
-      ->where('id', $user->id)
-      ->update([
-        'reset_password_token' => $adminResetToken,
-        'reset_token_expires_at' => Carbon::now()->addHours(24),
-        'updated_at' => DB::raw('updated_at'),
-      ]);
+      // If school code is found, try to fetch student profile
+      if ($schoolCode) {
+          try {
+              $targetDatabaseName = DatabaseManager::generateDatabaseName($schoolCode);
+              Log::info('Connecting to school database', [
+                  'database' => $targetDatabaseName,
+                  'school_code' => $schoolCode
+              ]);
 
-    $resetLink = url("/password-reset?token={$adminResetToken}&username={$user->username}&level=2");
+              $schoolDatabaseConnection = DatabaseManager::connect($targetDatabaseName);
 
-    $companyName = $this->getCompanyName();
+              // Debug: Check if user_id exists in student_records
+              $studentProfile = $schoolDatabaseConnection
+                  ->table('student_records')
+                  ->where('user_id', $user->user_id)
+                  ->first();
 
-    $emailBody = <<<TXT
-            Good day!
+              Log::info('Student profile query result', [
+                  'found' => $studentProfile ? 'Yes' : 'No',
+                  'user_id' => $user->user_id,
+                  'fullname' => $studentProfile->fullname ?? 'Not set'
+              ]);
 
-            Please reset my password for my account in SchoolMANAGER system.
+              if ($studentProfile && !empty($studentProfile->fullname)) {
+                  $fullName = $studentProfile->fullname;
+                  Log::info('✅ Successfully fetched student full name', [
+                      'user_id' => $user->user_id,
+                      'school_code' => $schoolCode,
+                      'fullname' => $fullName
+                  ]);
+              } else {
+                  Log::warning('⚠️ No student profile or fullname found for user', [
+                      'user_id' => $user->user_id,
+                      'school_code' => $schoolCode,
+                      'student_profile_exists' => $studentProfile ? 'Yes' : 'No',
+                      'fullname_value' => $studentProfile->fullname ?? 'NULL'
+                  ]);
 
-            Request Details:
-            Account Name: {$fullName}
-            Email: {$userEmail}
-            Request Time: {$currentDateTime}
-            Link Expires: {$expiryDateTime} (24 hours from request)
+                  // ✅ Fallback: Try to get fullname from users table if it exists
+                  if (!empty($user->fullname)) {
+                      $fullName = $user->fullname;
+                      Log::info('Using fullname from users table as fallback', [
+                          'fullname' => $fullName
+                      ]);
+                  }
+              }
 
-            Please use this link to reset my password (valid for 24 hours):
-            
-            {$resetLink}
+              DatabaseManager::disconnect($targetDatabaseName);
 
-            Thank you!
-            {$fullName}
+          } catch (\Exception $e) {
+              Log::error('❌ Could not fetch student profile, using username as fallback', [
+                  'user_id' => $user->id,
+                  'school_code' => $schoolCode,
+                  'error' => $e->getMessage(),
+                  'trace' => $e->getTraceAsString()
+              ]);
 
-            ***This is an automated notification from the SchoolMANAGER system.***
+              // ✅ Fallback: Try to get fullname from users table
+              if (!empty($user->fullname)) {
+                  $fullName = $user->fullname;
+              }
+          }
+      } else {
+          Log::warning('⚠️ Could not determine school code for user', [
+              'user_id' => $user->id,
+              'username' => $user->username,
+          ]);
 
-            This e-mail transmission is intended only for the addressee and may contain confidential information. Confidentiality is not waived if you are not the intended recipient of this e-mail, nor may you use, review, disclose, disseminate or copy any information contained in or attached to it. If you received this e-mail in error please delete it and any attachments and notify us immediately by reply e-mail. $companyName does not warrant that any attachments are free from viruses or other defects. You assume all liability for any loss, damage or other consequences which may arise from opening or using the attachments.
-        TXT;
+          // ✅ Fallback: Try to get fullname from users table
+          if (!empty($user->fullname)) {
+              $fullName = $user->fullname;
+          }
+      }
 
-    try {
-      Mail::raw($emailBody, function ($message) use ($user, $fullName) {
-        $message->to($user->assigned_admin_email)
-          ->subject('Password Reset Assistance Request - ' . $fullName);
-      });
-    } catch (\Exception $e) {
-      Log::error('Failed to send assistance request email', [
-        'user_id' => $user->id,
-        'error' => $e->getMessage()
-      ]);
+      $userEmail = $user->email ?? 'Not specified';
+      $currentDateTime = Carbon::now()->format('F j, Y \a\t g:i A');
+      $expiryDateTime = Carbon::now()->addHours(24)->format('F j, Y \a\t g:i A');
+      $adminResetToken = Str::random(60);
+
+      DB::table('users')
+          ->where('id', $user->id)
+          ->update([
+              'reset_password_token' => $adminResetToken,
+              'reset_token_expires_at' => Carbon::now()->addHours(24),
+              'updated_at' => DB::raw('updated_at'),
+          ]);
+
+      // ✅ Get frontend URL from config
+      $frontendUrl = config('app.frontend_url', 'http://localhost:3039');
+      $resetLink = "{$frontendUrl}/password-reset?token={$adminResetToken}&username={$user->username}&level=2";
+
+      $companyName = $this->getCompanyName();
+
+      $emailBody = <<<TXT
+          Good day!
+
+          Please reset my password for my account in SchoolMANAGER system.
+
+          Request Details:
+          Account Name: {$fullName}
+          Email: {$userEmail}
+          Request Time: {$currentDateTime}
+          Link Expires: {$expiryDateTime} (24 hours from request)
+
+          Please use this link to reset my password (valid for 24 hours):
+          
+          {$resetLink}
+
+          Thank you!
+          {$fullName}
+
+          ***This is an automated notification from the SchoolMANAGER system.***
+
+          This e-mail transmission is intended only for the addressee and may contain confidential information. Confidentiality is not waived if you are not the intended recipient of this e-mail, nor may you use, review, disclose, disseminate or copy any information contained in or attached to it. If you received this e-mail in error please delete it and any attachments and notify us immediately by reply e-mail. $companyName does not warrant that any attachments are free from viruses or other defects. You assume all liability for any loss, damage or other consequences which may arise from opening or using the attachments.
+      TXT;
+
+      try {
+          Mail::raw($emailBody, function ($message) use ($user, $fullName) {
+              $message->to($user->assigned_admin_email)
+                  ->subject('Password Reset Assistance Request - ' . $fullName);
+          });
+      } catch (\Exception $e) {
+          Log::error('Failed to send assistance request email', [
+              'user_id' => $user->id,
+              'error' => $e->getMessage()
+          ]);
+
+          return response()->json([
+              'success' => false,
+              'status' => 500,
+              'message' => 'Failed to send assistance request.',
+              'error' => $e->getMessage(),
+          ], 500);
+      }
 
       return response()->json([
-        'success' => false,
-        'status' => 500,
-        'message' => 'Failed to send assistance request.',
-        'error' => $e->getMessage(),
-      ], 500);
-    }
-
-    return response()->json([
-      'success' => true,
-      'status' => 200,
-      'message' => 'Your request for password reset assistance was sent successfully. Your request is valid for 24 hours. The school administrator will contact you soon.',
-      'data' => [
-        'username' => $user->username,
-        'assigned_admin_email' => $user->assigned_admin_email,
-      ],
-    ], 200);
+          'success' => true,
+          'status' => 200,
+          'message' => 'Your request for password reset assistance was sent successfully. Your request is valid for 24 hours. The school administrator will contact you soon.',
+          'data' => [
+              'username' => $user->username,
+              'assigned_admin_email' => $user->assigned_admin_email,
+          ],
+      ], 200);
   }
 }
