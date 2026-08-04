@@ -34,19 +34,20 @@ interface OtpViewProps {
 
 export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewProps) {
   const router = useRouter();
-  const [otp, setOtp] = useState(Array(6).fill(''));
-  const [error, setError] = useState('');
-  const [touched, setTouched] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [resendCountdown, setResendCountdown] = useState(0);
-  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
-  const [successDialogMessage, setSuccessDialogMessage] = useState('');
-  const [otpExpired, setOtpExpired] = useState(false);
-  const [showInvalidAccessDialog, setShowInvalidAccessDialog] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(true);
+  const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
+  const [error, setError] = useState<string>('');
+  const [touched, setTouched] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [resendCountdown, setResendCountdown] = useState<number>(0);
+  const [showSuccessDialog, setShowSuccessDialog] = useState<boolean>(false);
+  const [successDialogMessage, setSuccessDialogMessage] = useState<string>('');
+  const [otpExpired, setOtpExpired] = useState<boolean>(false);
+  const [showInvalidAccessDialog, setShowInvalidAccessDialog] = useState<boolean>(false);
+  const [checkingSession, setCheckingSession] = useState<boolean>(true);
   const [otpExpiryTime, setOtpExpiryTime] = useState<Date | null>(null);
   const [resetToken, setResetToken] = useState<string>('');
   const [remainingSeconds, setRemainingSeconds] = useState<number>(0);
+
   const inputRefs = useRef<Array<HTMLInputElement | null>>([]);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const countdownTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -67,7 +68,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
   useEffect(() => {
     const fetchOtpSession = async () => {
       try {
-        const params: any = { username };
+        const params: Record<string, string> = { username };
         if (schoolCode) {
           params.school_code = schoolCode;
         }
@@ -91,7 +92,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
           setOtpExpired(true);
           setShowInvalidAccessDialog(true);
         }
-      } catch (fetchError) {
+      } catch {
         setOtpExpired(true);
         setShowInvalidAccessDialog(true);
       } finally {
@@ -138,16 +139,6 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     countdownTimerRef.current = timer;
   }, [otpExpiryTime, otpExpired, remainingSeconds]);
 
-  useEffect(
-    () => () => {
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
-      }
-    },
-    []
-  );
-
   useEffect(() => {
     if (!otpExpired && !checkingSession) {
       inputRefs.current[0]?.focus();
@@ -162,12 +153,75 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     return () => clearTimeout(timer);
   }, [resendCountdown]);
 
-  const formatTime = useCallback((seconds: number) => {
+  // Single cleanup effect for all timers
+  useEffect(() => {
+    if (!otpExpiryTime || otpExpired || remainingSeconds <= 0) {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+      return;
+    }
+
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+    }
+
+    const timer = setInterval(() => {
+      setRemainingSeconds((prev) => {
+        if (prev <= 1) {
+          if (countdownTimerRef.current) {
+            clearInterval(countdownTimerRef.current);
+            countdownTimerRef.current = null;
+          }
+          setOtpExpired(true);
+          setShowInvalidAccessDialog(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    countdownTimerRef.current = timer;
+  }, [otpExpiryTime, otpExpired, remainingSeconds]);
+
+  // Focus input
+  useEffect(() => {
+    if (!otpExpired && !checkingSession) {
+      inputRefs.current[0]?.focus();
+    }
+  }, [otpExpired, checkingSession]);
+
+  // Resend countdown
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>;
+    if (resendCountdown > 0) {
+      timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
+    }
+    return () => clearTimeout(timer);
+  }, [resendCountdown]);
+
+  // Cleanup all timers - FIXED with implicit return
+  useEffect(
+    () => () => {
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+    },
+    []
+  );
+
+  const formatTime = useCallback((seconds: number): string => {
     if (seconds <= 0) return 'Expired';
     return `${seconds} seconds`;
   }, []);
 
-  const validateOtp = useCallback(() => {
+  const validateOtp = useCallback((): boolean => {
     const code = otp.join('');
     if (code.length !== 6) {
       setError('Please enter the complete 6-digit code');
@@ -178,7 +232,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
   }, [otp]);
 
   const handleChange = useCallback(
-    (value: string, index: number) => {
+    (value: string, index: number): void => {
       if (otpExpired) return;
       if (!/^[0-9]?$/.test(value)) return;
 
@@ -193,7 +247,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
   );
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>, index: number) => {
+    (e: React.KeyboardEvent<HTMLInputElement>, index: number): void => {
       if (otpExpired) return;
       if (e.key === 'Backspace' && !otp[index] && index > 0) {
         inputRefs.current[index - 1]?.focus();
@@ -202,21 +256,21 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     [otp, otpExpired]
   );
 
-  const clearOtpFields = useCallback(() => {
+  const clearOtpFields = useCallback((): void => {
     setOtp(Array(6).fill(''));
     setTimeout(() => {
       inputRefs.current[0]?.focus();
     }, 10);
   }, []);
 
-  const handleVerify = useCallback(async () => {
+  const handleVerify = useCallback(async (): Promise<void> => {
     if (otpExpired) return;
     setTouched(true);
     if (!validateOtp()) return;
 
     setLoading(true);
     try {
-      const requestBody: any = {
+      const requestBody: Record<string, string> = {
         otp_code: otp.join(''),
         username,
       };
@@ -237,7 +291,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
 
         if (firstUserToken) {
           setSuccessDialogMessage(
-            `OTP verification was successful! You can now proceed with registration.`
+            'OTP verification was successful! You can now proceed with registration.'
           );
           localStorage.setItem('first_user_token', firstUserToken);
           if (onOtpVerified) {
@@ -246,7 +300,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         } else if (passwordResetToken) {
           setResetToken(passwordResetToken);
           setSuccessDialogMessage(
-            `OTP verification was successful! You can now reset your password.`
+            'OTP verification was successful! You can now reset your password.'
           );
           if (onOtpVerified) {
             onOtpVerified();
@@ -258,13 +312,19 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         setError(res.message ?? 'Verification failed.');
         clearOtpFields();
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as {
+        response?: { status?: number; data?: { message?: string } };
+        message?: string;
+      };
       let errorMessage =
-        err?.response?.data?.message || err?.message || 'Verification failed. Please try again.';
+        errorObj?.response?.data?.message ||
+        errorObj?.message ||
+        'Verification failed. Please try again.';
 
-      if (err?.response?.status === 400) {
+      if (errorObj?.response?.status === 400) {
         errorMessage = 'Invalid OTP. Please try again.';
-      } else if (err?.response?.status === 410) {
+      } else if (errorObj?.response?.status === 410) {
         errorMessage = 'OTP has expired. Please request a new one.';
         setOtpExpired(true);
       }
@@ -277,7 +337,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
   }, [otp, username, schoolCode, validateOtp, otpExpired, clearOtpFields, onOtpVerified]);
 
   const handleKeyPress = useCallback(
-    (e: React.KeyboardEvent<HTMLInputElement>) => {
+    (e: React.KeyboardEvent<HTMLInputElement>): void => {
       if (otpExpired) return;
       if (e.key === 'Enter') {
         e.preventDefault();
@@ -287,14 +347,14 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     [otpExpired, handleVerify]
   );
 
-  const handleResendOtp = useCallback(async () => {
+  const handleResendOtp = useCallback(async (): Promise<void> => {
     if (resendCountdown > 0 || otpExpired) return;
     setLoading(true);
     setError('');
 
     try {
       let response;
-      const requestBody: any = { username };
+      const requestBody: Record<string, string> = { username };
       if (schoolCode) {
         requestBody.school_code = schoolCode;
       }
@@ -317,7 +377,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         setResendCountdown(30);
         setOtpExpired(false);
 
-        const sessionParams: any = { username };
+        const sessionParams: Record<string, string> = { username };
         if (schoolCode) {
           sessionParams.school_code = schoolCode;
         }
@@ -334,18 +394,24 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
           setRemainingSeconds(newSeconds);
         }
 
-        setSuccessDialogMessage(`A new OTP has been sent to your email.`);
+        setSuccessDialogMessage('A new OTP has been sent to your email.');
         setShowSuccessDialog(true);
       } else {
         setError(res.message ?? 'Failed to resend OTP.');
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorObj = err as {
+        response?: { status?: number; data?: { message?: string } };
+        message?: string;
+      };
       let errorMessage =
-        err?.response?.data?.message || err?.message || 'Failed to resend OTP. Please try again.';
+        errorObj?.response?.data?.message ||
+        errorObj?.message ||
+        'Failed to resend OTP. Please try again.';
 
       if (
         email &&
-        (err?.response?.status === 422 ||
+        (errorObj?.response?.status === 422 ||
           errorMessage.includes('email') ||
           errorMessage.includes('Email'))
       ) {
@@ -367,7 +433,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     calculateRemainingSeconds,
   ]);
 
-  const handleSuccessClose = () => {
+  const handleSuccessClose = useCallback((): void => {
     if (redirectTimerRef.current) {
       clearTimeout(redirectTimerRef.current);
       redirectTimerRef.current = null;
@@ -383,25 +449,12 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     } else {
       router.push('/login');
     }
-  };
+  }, [resetToken, username, onOtpVerified, router]);
 
-  const handleInvalidAccessClose = () => {
+  const handleInvalidAccessClose = useCallback((): void => {
     setShowInvalidAccessDialog(false);
     router.push('/login');
-  };
-
-  useEffect(
-    () => () => {
-      if (redirectTimerRef.current) {
-        clearTimeout(redirectTimerRef.current);
-      }
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
-      }
-    },
-    []
-  );
+  }, [router]);
 
   if (checkingSession) {
     return (

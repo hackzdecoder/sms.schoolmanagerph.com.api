@@ -91,91 +91,114 @@ class EmailController extends Controller
 
   public function resetPasswordRequestLvlOne(Request $request)
   {
-    $request->merge(['username' => trim($request->username)]);
-
-    $validator = Validator::make($request->all(), [
-      'username' => 'required|string|exists:users,username',
-    ], [
-      'username.required' => 'Username is required.',
-      'username.exists' => 'Username not found in our records.',
-    ]);
-
-    if ($validator->fails()) {
-      return response()->json([
-        'success' => false,
-        'status' => 422,
-        'message' => 'Validation failed.',
-        'errors' => $validator->errors(),
-      ], 422);
-    }
-
-    $user = User::where('username', $request->username)->first();
-
-    if ($user->account_status !== 'active') {
-      return response()->json([
-        'success' => false,
-        'status' => 403,
-        'message' => 'Your account has been deactivated',
-        'account_status' => $user->account_status,
-      ], 403);
-    }
-
-    if (!$user->email) {
-      return response()->json([
-        'success' => false,
-        'status' => 400,
-        'message' => 'This account does not have a registered email',
-      ], 400);
-    }
-
-    $otp = rand(100000, 999999);
-
-    DB::table('users')
-      ->where('id', $user->id)
-      ->update([
-        'otp_code' => $otp,
-        'otp_verified_at' => null,
-        'otp_code_expired_at' => Carbon::now()->addMinutes(5),
-        'updated_at' => DB::raw('updated_at'),
+      // 1. Merge and trim inputs
+      $request->merge([
+          'username' => trim($request->username),
+          'school_code' => trim($request->school_code ?? ''),
       ]);
 
-    // Get company name from trademarks database
-    $companyName = $this->getCompanyName();
+      // 2. Validate - both username and school_code are REQUIRED
+      $validator = Validator::make($request->all(), [
+          'username' => 'required|string',
+          'school_code' => 'required|string',
+      ], [
+          'username.required' => 'Username is required.',
+          'school_code.required' => 'School code is required.',
+      ]);
 
-    $emailBody = <<<TXT
-            Your One-Time Password (OTP) is: $otp
+      if ($validator->fails()) {
+          return response()->json([
+              'success' => false,
+              'status' => 422,
+              'message' => 'Validation failed.',
+              'errors' => $validator->errors(),
+          ], 422);
+      }
 
-            (valid for 5 minutes).
+      // 3. Find user with BOTH username AND school_code
+      $user = User::where('username', $request->username)
+          ->where('school_code', $request->school_code)
+          ->first();
 
-            ***Please do not reply to this email. This is an automated confirmation that we have received your request for system password reset.***
+      if (!$user) {
+          return response()->json([
+              'success' => false,
+              'status' => 404,
+              'message' => 'User not found for this school.',
+          ], 404);
+      }
 
-            This e-mail transmission is intended only for the addressee and may contain confidential information. Confidentiality is not waived if you are not the intended recipient of this e-mail, nor may you use, review, disclose, disseminate or copy any information contained in or attached to it. If you received this e-mail in error please delete it and any attachments and notify us immediately by reply e-mail. $companyName does not warrant that any attachments are free from viruses or other defects. You assume all liability for any loss, damage or other consequences which may arise from opening or using the attachments.
-        TXT;
+      // 4. Check if account is active
+      if ($user->account_status !== 'active') {
+          return response()->json([
+              'success' => false,
+              'status' => 403,
+              'message' => 'Your account has been deactivated',
+              'account_status' => $user->account_status,
+          ], 403);
+      }
 
-    try {
-      Mail::raw($emailBody, function ($message) use ($user) {
-        $message->to($user->email)
-          ->subject('Password Reset OTP');
-      });
-    } catch (\Exception $e) {
+      // 5. Check if user has an email
+      if (!$user->email) {
+          return response()->json([
+              'success' => false,
+              'status' => 400,
+              'message' => 'This account does not have a registered email',
+          ], 400);
+      }
+
+      // 6. Generate OTP
+      $otp = rand(100000, 999999);
+
+      // 7. Save OTP to database
+      DB::table('users')
+          ->where('id', $user->id)
+          ->update([
+              'otp_code' => $otp,
+              'otp_verified_at' => null,
+              'otp_code_expired_at' => Carbon::now()->addMinutes(5),
+              'updated_at' => DB::raw('updated_at'),
+          ]);
+
+      // 8. Get company name for email
+      $companyName = $this->getCompanyName();
+
+      // 9. Send OTP email
+      $emailBody = <<<TXT
+          Your One-Time Password (OTP) is: $otp
+
+          (valid for 5 minutes).
+
+          ***Please do not reply to this email. This is an automated confirmation that we have received your request for system password reset.***
+
+          This e-mail transmission is intended only for the addressee and may contain confidential information. Confidentiality is not waived if you are not the intended recipient of this e-mail, nor may you use, review, disclose, disseminate or copy any information contained in or attached to it. If you received this e-mail in error please delete it and any attachments and notify us immediately by reply e-mail. $companyName does not warrant that any attachments are free from viruses or other defects. You assume all liability for any loss, damage or other consequences which may arise from opening or using the attachments.
+      TXT;
+
+      try {
+          Mail::raw($emailBody, function ($message) use ($user) {
+              $message->to($user->email)
+                  ->subject('Password Reset OTP');
+          });
+      } catch (\Exception $e) {
+          return response()->json([
+              'success' => false,
+              'status' => 500,
+              'message' => 'Failed to send OTP email.',
+              'error' => $e->getMessage(),
+          ], 500);
+      }
+
+      // 10. Return success response
       return response()->json([
-        'success' => false,
-        'status' => 500,
-        'message' => 'Failed to send OTP email.',
-        'error' => $e->getMessage(),
-      ], 500);
-    }
-
-    return response()->json([
-      'success' => true,
-      'status' => 200,
-      'message' => 'OTP sent successfully.',
-      'data' => [
-        'username' => $user->username,
-        'email' => $user->email,
-        'email_hint' => substr($user->email, 0, 3) . '****' . strstr($user->email, '@'),
-      ],
-    ], 200);
+          'success' => true,
+          'status' => 200,
+          'message' => 'OTP sent successfully.',
+          'data' => [
+              'username' => $user->username,
+              'email' => $user->email,
+              'email_hint' => substr($user->email, 0, 3) . '****' . strstr($user->email, '@'),
+          ],
+      ], 200);
   }
 
   public function resetPasswordRequestLvlTwo(Request $request)
