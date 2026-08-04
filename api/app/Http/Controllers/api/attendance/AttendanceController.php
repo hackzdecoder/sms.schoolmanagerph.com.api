@@ -250,6 +250,9 @@ class AttendanceController extends Controller
     ]);
 
     try {
+      // Attendance notifications are excluded as per requirements
+      $success = true;
+      /*
       // Use the NotificationService to send push notification
       $success = \App\Services\NotificationService::sendToUser(
         $request->user_id,
@@ -257,10 +260,11 @@ class AttendanceController extends Controller
         $request->message,
         ['type' => 'attendance']
       );
+      */
 
       return response()->json([
         'success' => $success,
-        'message' => $success ? 'Notification sent successfully' : 'Failed to send notification or no devices registered'
+        'message' => $success ? 'Notification sent successfully (disabled for attendance)' : 'Failed to send notification or no devices registered'
       ]);
     } catch (\Exception $e) {
       return response()->json([

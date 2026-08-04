@@ -9,7 +9,7 @@ use Illuminate\Support\Facades\DB;
 class NotificationService
 {
     /**
-     * Send a push notification via OneSignal to a specific user (targeting player IDs directly)
+     * Send a push notification via OneSignal to a specific user (targeting subscription IDs directly)
      *
      * @param string $userId The user's ID
      * @param string $title Notification title
@@ -19,25 +19,34 @@ class NotificationService
      */
     public static function sendToUser(string $userId, string $title, string $message, array $data = [])
     {
-        // Get all active player IDs for this user directly from push_devices
-        $playerIds = DB::connection('users_main')->table('push_devices')
+        // Get all active subscription/player IDs for this user directly from push_devices
+        $subscriptionIds = DB::connection('users_main')->table('push_devices')
             ->where('user_id', $userId)
             ->where('is_active', true)
             ->pluck('player_id')
             ->toArray();
 
-        // If no devices registered, skip
-        if (empty($playerIds)) {
+        // If no devices registered, log and skip
+        if (empty($subscriptionIds)) {
+            Log::warning("NotificationService: No active devices found for user {$userId}. Skipping push notification.", [
+                'user_id' => $userId,
+                'title' => $title,
+            ]);
             return false;
         }
 
-        return self::sendOneSignal($playerIds, $title, $message, $data);
+        Log::info("NotificationService: Found " . count($subscriptionIds) . " active device(s) for user {$userId}. Sending push.", [
+            'user_id' => $userId,
+            'subscription_ids' => $subscriptionIds,
+        ]);
+
+        return self::sendOneSignal($subscriptionIds, $title, $message, $data);
     }
 
     /**
-     * Send push notification directly to device player IDs
+     * Send push notification directly to device subscription IDs via OneSignal
      */
-    private static function sendOneSignal(array $playerIds, string $title, string $message, array $data = [])
+    private static function sendOneSignal(array $subscriptionIds, string $title, string $message, array $data = [])
     {
         $appId = env('ONESIGNAL_APP_ID');
         $apiKey = env('ONESIGNAL_REST_API_KEY');
@@ -48,16 +57,20 @@ class NotificationService
         }
 
         try {
-            $response = Http::withHeaders([
-                'Authorization' => 'Basic ' . $apiKey,
-                'Content-Type' => 'application/json; charset=utf-8',
-            ])->post('https://onesignal.com/api/v1/notifications', [
+            $payload = [
                 'app_id' => $appId,
-                'include_player_ids' => $playerIds,
+                'include_player_ids' => $subscriptionIds,
                 'headings' => ['en' => $title],
                 'contents' => ['en' => $message],
                 'data' => $data,
-            ]);
+            ];
+
+            Log::info('NotificationService: Sending OneSignal request', ['payload' => $payload]);
+
+            $response = Http::withHeaders([
+                'Authorization' => 'Basic ' . $apiKey,
+                'Content-Type' => 'application/json; charset=utf-8',
+            ])->post('https://onesignal.com/api/v1/notifications', $payload);
 
             if ($response->successful()) {
                 Log::info('OneSignal push sent successfully', ['response' => $response->json()]);

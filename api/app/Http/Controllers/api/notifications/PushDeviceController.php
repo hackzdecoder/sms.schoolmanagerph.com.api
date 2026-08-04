@@ -10,7 +10,8 @@ use Illuminate\Support\Facades\Log;
 class PushDeviceController extends Controller
 {
     /**
-     * Register a new device for push notifications
+     * Register a new device for push notifications.
+     * Enforces one-to-one: only the latest device per user receives notifications.
      */
     public function registerDevice(Request $request)
     {
@@ -32,34 +33,32 @@ class PushDeviceController extends Controller
             $userId = $authUser->user_id;
             $schoolCode = $authUser->school_code;
 
-            // Check if device already exists
-            $existing = DB::connection('users_main')->table('push_devices')
-                ->where('player_id', $request->player_id)
-                ->first();
+            // ─── STEP 1: Delete previous device records for this user ───
+            // This ensures only the latest device receives push notifications (1:1 relationship).
+            // NOTE: We keep notification_logs intact so already-notified messages are NOT re-sent.
+            DB::connection('users_main')->table('push_devices')
+                ->where('user_id', $userId)
+                ->delete();
 
-            if ($existing) {
-                // Update existing device
-                DB::connection('users_main')->table('push_devices')
-                    ->where('id', $existing->id)
-                    ->update([
-                        'user_id' => $userId,
-                        'school_code' => $schoolCode,
-                        'platform' => $request->platform ?? 'web',
-                        'is_active' => true,
-                        'updated_at' => now()
-                    ]);
-            } else {
-                // Insert new device
-                DB::connection('users_main')->table('push_devices')->insert([
-                    'user_id' => $userId,
-                    'school_code' => $schoolCode,
-                    'player_id' => $request->player_id,
-                    'platform' => $request->platform ?? 'web',
-                    'is_active' => true,
-                    'created_at' => now(),
-                    'updated_at' => now()
-                ]);
-            }
+            Log::info("PushDevice: Deleted previous devices for user {$userId}");
+
+            // ─── STEP 2: Also remove any existing record tied to this player_id from previous logins ───
+            DB::connection('users_main')->table('push_devices')
+                ->where('player_id', $request->player_id)
+                ->delete();
+
+            // ─── STEP 3: Insert the current device as the active push device ───
+            DB::connection('users_main')->table('push_devices')->insert([
+                'user_id' => $userId,
+                'school_code' => $schoolCode,
+                'player_id' => $request->player_id,
+                'platform' => $request->platform ?? 'web',
+                'is_active' => true,
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+
+            Log::info("PushDevice: Registered device for user {$userId} (player_id: {$request->player_id})");
 
             return response()->json([
                 'success' => true,

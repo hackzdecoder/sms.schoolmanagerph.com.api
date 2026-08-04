@@ -16,7 +16,7 @@ export function AccountView() {
           aria-label="breadcrumb"
           separator={
             <Iconify
-              icon={"eva:chevron-right-fill" as any}
+              icon={'eva:chevron-right-fill' as any}
               width={14}
               sx={{ color: 'text.secondary', mx: 0.5 }}
             />
@@ -28,7 +28,7 @@ export function AccountView() {
             href="/"
             sx={{ display: 'flex', alignItems: 'center', fontWeight: 500 }}
           >
-            <Iconify icon={"eva:home-outline" as any} width={16} sx={{ mr: 0.5 }} />
+            <Iconify icon={'eva:home-outline' as any} width={16} sx={{ mr: 0.5 }} />
             Dashboard
           </Link>
 
