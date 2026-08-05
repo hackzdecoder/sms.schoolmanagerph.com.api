@@ -509,7 +509,7 @@ export function PasswordResetView() {
     if (isLevelTwo) {
       window.location.href = 'https://www.google.com/';
     } else {
-      router.push('/reset-options');
+      router.push('/login');
     }
   };
 

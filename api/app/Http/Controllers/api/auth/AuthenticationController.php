@@ -190,7 +190,7 @@ class AuthenticationController extends Controller
     }
 
     if ($userRecord->account_status !== 'active') {
-      return response()->json(['message' => 'Your account has been deactivated'], 403);
+      return response()->json(['message' => 'You have been logged out'], 403);
     }
 
     RateLimiter::clear($rateLimitKey);
@@ -332,7 +332,7 @@ class AuthenticationController extends Controller
       $authenticatedUser->currentAccessToken()->delete();
       DatabaseManager::disconnect('users_main');
       return response()->json([
-        'message' => 'Your account has been deactivated',
+        'message' => 'You have been logged out',
         'account_status' => $freshUserData->account_status,
         'logged_out' => true,
       ], 403);
@@ -607,7 +607,7 @@ class AuthenticationController extends Controller
       DatabaseManager::disconnect('users_main');
       return response()->json([
         'success' => false,
-        'message' => 'Your account has been deactivated',
+        'message' => 'You have been logged out',
         'account_status' => $statusCheckUser->account_status,
         'logged_out' => true,
       ], 403);

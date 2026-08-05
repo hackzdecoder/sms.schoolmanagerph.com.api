@@ -457,7 +457,7 @@ export default function App({ children }: AppProps) {
           }
 
           // Show dialog
-          setDialogMessage('Your account has been deactivated');
+          setDialogMessage('You have been logged out');
           setShowAccountDeactivatedDialog(true);
 
           // Clear storage immediately
@@ -508,7 +508,7 @@ export default function App({ children }: AppProps) {
                 intervalRef.current = null;
               }
 
-              setDialogMessage('Your account has been deactivated');
+              setDialogMessage('You have been logged out');
               setShowAccountDeactivatedDialog(true);
               localStorage.removeItem('auth_token');
               localStorage.removeItem('auth_user');
@@ -632,7 +632,7 @@ export default function App({ children }: AppProps) {
           </Typography>
 
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
-            {dialogMessage || 'Your account has been deactivated'}
+            {dialogMessage || 'You have been logged out'}
           </Typography>
 
           <Button
