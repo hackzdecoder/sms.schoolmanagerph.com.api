@@ -56,6 +56,30 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend Application URL
+    |--------------------------------------------------------------------------
+    |
+    | This URL is used to generate links in emails and notifications that
+    | point to the frontend React/Vite application.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', function () {
+        $env = env('APP_ENV', 'dev');
+        
+        switch ($env) {
+            case 'production':
+                return 'https://sms.schoolmanagerph.com';
+            case 'staging':
+                return 'https://sms-staging.schoolmanagerph.com';
+            case 'dev':
+            default:
+                return 'http://localhost:3039';
+        }
+    }),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

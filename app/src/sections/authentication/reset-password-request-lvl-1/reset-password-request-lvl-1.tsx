@@ -4,33 +4,42 @@ import { useRouter } from 'src/routes/hooks';
 import api from 'src/routes/api/config';
 import { Logo } from 'src/components/logo';
 
+interface Errors {
+  username?: string;
+  school_code?: string;
+}
+
 export function ResetPasswordRequestLvlOneView() {
   const router = useRouter();
 
-  const [username, setUsername] = useState('');
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [username, setUsername] = useState<string>('');
+  const [schoolCode, setSchoolCode] = useState<string>('');
+  const [errors, setErrors] = useState<Errors>({});
   const [touched, setTouched] = useState<{ [key: string]: boolean }>({});
-  const [loading, setLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-
-  // Dialog state
-  const [openSuccessDialog, setOpenSuccessDialog] = useState(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
+  const [openSuccessDialog, setOpenSuccessDialog] = useState<boolean>(false);
 
   // Validate all fields
-  const validateAllFields = useCallback(() => {
-    const newErrors: { [key: string]: string } = {};
+  const validateAllFields = useCallback((): Errors => {
+    const newErrors: Errors = {};
     if (!username.trim()) newErrors.username = 'Username is required';
+    if (!schoolCode.trim()) newErrors.school_code = 'School code is required';
     setErrors(newErrors);
     return newErrors;
-  }, [username]);
+  }, [username, schoolCode]);
 
   // Validate a single field
   const validateField = useCallback(
-    (name: string, value: string) => {
+    (name: string, value: string): void => {
       const newErrors = { ...errors };
       if (name === 'username') {
         if (!value.trim()) newErrors.username = 'Username is required';
         else delete newErrors.username;
+      }
+      if (name === 'school_code') {
+        if (!value.trim()) newErrors.school_code = 'School code is required';
+        else delete newErrors.school_code;
       }
       setErrors(newErrors);
     },
@@ -38,8 +47,8 @@ export function ResetPasswordRequestLvlOneView() {
   );
 
   // Handle reset password request
-  const handleRequestReset = useCallback(() => {
-    setTouched({ username: true });
+  const handleRequestReset = useCallback((): void => {
+    setTouched({ username: true, school_code: true });
 
     const validationErrors = validateAllFields();
     if (Object.keys(validationErrors).length > 0) return;
@@ -49,18 +58,22 @@ export function ResetPasswordRequestLvlOneView() {
     setSuccessMessage('');
 
     api
-      .post('/reset-password-request-lvl-one', { username })
+      .post('/reset-password-request-lvl-one', {
+        username: username.trim(),
+        school_code: schoolCode.trim().toUpperCase(),
+      })
       .then((res: any) => {
-
         const responseData = res.data?.data || {};
 
         setSuccessMessage(`Check your email ${responseData.email} for the OTP`);
 
-        // store username in sessionStorage as fallback
-        sessionStorage.setItem('otpUsername', username);
+        // Store username and school_code in sessionStorage for OTP page
+        sessionStorage.setItem('otpUsername', username.trim());
+        sessionStorage.setItem('schoolCode', schoolCode.trim().toUpperCase());
 
-        // open the success modal
+        // Open the success modal
         setOpenSuccessDialog(true);
+        setLoading(false);
       })
       .catch((err: any) => {
         // If server indicates redirect to login
@@ -74,49 +87,49 @@ export function ResetPasswordRequestLvlOneView() {
         } else {
           setErrors({ username: err.response?.data?.message || 'An error occurred' });
         }
-      })
-      .then(() => setLoading(false));
-  }, [username, validateAllFields, router]);
+        setLoading(false);
+      });
+  }, [username, schoolCode, validateAllFields, router]);
 
   // Handle Enter key press
   const handleKeyPress = useCallback(
-    (event: React.KeyboardEvent<HTMLInputElement>) => {
-      if (event.key === 'Enter') handleRequestReset();
+    (event: React.KeyboardEvent<HTMLInputElement>): void => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleRequestReset();
+      }
     },
     [handleRequestReset]
   );
 
   // Handle input change
   const handleFieldChange = useCallback(
-    (field: string) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      if (field === 'username') setUsername(value);
-      if (touched[field]) validateField(field, value);
-    },
+    (field: string) =>
+      (e: React.ChangeEvent<HTMLInputElement>): void => {
+        const value = e.target.value;
+        if (field === 'username') setUsername(value);
+        if (field === 'school_code') setSchoolCode(value.toUpperCase());
+        if (touched[field]) validateField(field, value);
+      },
     [touched, validateField]
   );
 
   // Handle input blur
   const handleFieldBlur = useCallback(
-    (field: string) => () => {
+    (field: string) => (): void => {
       setTouched((prev) => ({ ...prev, [field]: true }));
-      validateField(field, field === 'username' ? username : '');
+      const value = field === 'username' ? username : schoolCode;
+      validateField(field, value);
     },
-    [username, validateField]
+    [username, schoolCode, validateField]
   );
 
   // Dialog OK handler
-  const handleDialogOk = () => {
+  const handleDialogOk = useCallback((): void => {
     setOpenSuccessDialog(false);
-    // Redirect to OTP page; OTP page will load username from server session (and sessionStorage fallback)
+    // Redirect to OTP page; OTP page will load username and schoolCode from sessionStorage
     router.push('/otp-authentication');
-  };
-
-  // Handle Reset Password Assistance click
-  const handleResetPasswordAssistance = () => {
-    // Redirect to level 2 reset password assistance
-    router.push('/reset-password-request-lvl-2');
-  };
+  }, [router]);
 
   return (
     <Box
@@ -166,7 +179,7 @@ export function ResetPasswordRequestLvlOneView() {
               mb: { xs: 3, sm: 4 },
             }}
           >
-            <Logo sx={{ alignItems: 'center', justifyContent: 'center', }} />
+            <Logo sx={{ alignItems: 'center', justifyContent: 'center' }} />
           </Box>
 
           {/* Form Title */}
@@ -193,6 +206,31 @@ export function ResetPasswordRequestLvlOneView() {
               onBlur={handleFieldBlur('username')}
               onKeyPress={handleKeyPress}
               error={touched.username && !!errors.username}
+              disabled={loading}
+              size="medium"
+            />
+
+            <TextField
+              fullWidth
+              label={touched.school_code && errors.school_code ? errors.school_code : 'School Code'}
+              value={schoolCode}
+              onChange={handleFieldChange('school_code')}
+              onBlur={handleFieldBlur('school_code')}
+              onKeyPress={handleKeyPress}
+              error={touched.school_code && !!errors.school_code}
+              disabled={loading}
+              size="medium"
+              placeholder="Enter your school code"
+              helperText="Enter the school code associated with your account"
+              slotProps={{
+                input: {
+                  sx: {
+                    '& input': {
+                      textTransform: 'uppercase',
+                    },
+                  },
+                },
+              }}
             />
 
             {successMessage && (
@@ -205,14 +243,14 @@ export function ResetPasswordRequestLvlOneView() {
               fullWidth
               variant="contained"
               size="large"
-              sx={{ mt: 1.5 }}
+              sx={{ mt: 1.5, py: 1.5, fontWeight: 600, borderRadius: 1.5 }}
               onClick={handleRequestReset}
-              disabled={loading}
+              disabled={loading || !username.trim() || !schoolCode.trim()}
             >
               {loading ? 'REQUESTING...' : 'SUBMIT'}
             </Button>
 
-            {/* Links Section - Back to Login on left, Reset Password Assistance on right */}
+            {/* Links Section */}
             <Box sx={{ textAlign: 'center', mt: 1.5 }}>
               <Link
                 variant="body2"
@@ -222,7 +260,7 @@ export function ResetPasswordRequestLvlOneView() {
                   fontWeight: 500,
                   fontSize: { xs: '0.82rem', sm: '0.875rem' },
                   '&:hover': { color: 'primary.main' },
-                  ...(loading && { pointerEvents: 'none', opacity: 0.5 })
+                  ...(loading && { pointerEvents: 'none', opacity: 0.5 }),
                 }}
                 onClick={() => !loading && router.push('/reset-options')}
               >
@@ -233,23 +271,24 @@ export function ResetPasswordRequestLvlOneView() {
         </Box>
       </Box>
 
-      {/* SUCCESS DIALOG (minimal and beautiful) */}
+      {/* SUCCESS DIALOG */}
       <Dialog
         open={openSuccessDialog}
-        onClose={() => { }}
+        onClose={() => {}}
         disableEscapeKeyDown
-        PaperProps={{
-          sx: {
-            borderRadius: 3,
-            p: 3,
-            width: 340,
-            textAlign: 'center',
-            boxShadow: '0 8px 28px rgba(17, 24, 39, 0.12)',
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: 3,
+              p: 3,
+              width: 340,
+              textAlign: 'center',
+              boxShadow: '0 8px 28px rgba(17, 24, 39, 0.12)',
+            },
           },
         }}
       >
         <Box sx={{ textAlign: 'center' }}>
-          {/* Inline check SVG */}
           <Box
             sx={{
               width: 68,

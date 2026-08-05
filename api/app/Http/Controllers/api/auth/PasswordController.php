@@ -14,9 +14,12 @@ class PasswordController extends Controller
 {
     public function validateResetLink(Request $request)
     {
+
+
         $validator = Validator::make($request->all(), [
-            'username' => 'required|exists:users,username',
-            'token' => 'required',
+            'username' => 'required|string',
+            'token' => 'required|string',
+            'school_code' => 'nullable|string',
         ]);
 
         if ($validator->fails()) {
@@ -25,41 +28,61 @@ class PasswordController extends Controller
                 'status' => 422,
                 'valid' => false,
                 'message' => 'Validation failed.',
+                'errors' => $validator->errors(),
             ], 422);
         }
 
-        // Find user first
-        $user = User::where('username', $request->username)->first();
+        // ✅ Fix: Include token in the query
+        $query = User::where('username', $request->username)
+            ->where('reset_password_token', $request->token);
+        
+        if ($request->has('school_code') && !empty($request->school_code)) {
+            $query->where('school_code', $request->school_code);
+        }
+        
+        $user = $query->first();
 
         if (!$user) {
             return response()->json([
                 'success' => false,
                 'status' => 401,
                 'valid' => false,
-                'message' => 'Invalid reset token.',
+                'message' => 'Invalid reset token or user not found.',
             ], 401);
         }
 
-        // CRITICAL CHECK: If token is NULL (already used) or doesn't match
-        if (!$user->reset_password_token || $user->reset_password_token !== $request->token) {
+        // ✅ Check if token is NULL (already used)
+        if (!$user->reset_password_token) {
             return response()->json([
                 'success' => false,
                 'status' => 410,
                 'valid' => false,
-                'message' => 'Reset token has already been used or is invalid.',
+                'message' => 'Reset token has already been used.',
                 'reset_level' => $request->get('level') ? intval($request->get('level')) : 1
             ], 410);
         }
 
-        if (Carbon::now()->gt($user->reset_token_expires_at)) {
+        // ✅ Check if token has expired
+        $now = Carbon::now();
+        $expiresAt = Carbon::parse($user->reset_token_expires_at);
+    
+
+        if ($now->gt($expiresAt)) {
             return response()->json([
                 'success' => false,
                 'status' => 410,
                 'valid' => false,
                 'message' => 'Reset token has expired.',
-                'reset_level' => $request->get('level') ? intval($request->get('level')) : 1
+                'reset_level' => $request->get('level') ? intval($request->get('level')) : 1,
+                'debug' => [
+                    'expires_at' => $expiresAt->toDateTimeString(),
+                    'current_time' => $now->toDateTimeString(),
+                ]
             ], 410);
         }
+
+        // ✅ Get fullname
+        $fullname = $user->fullname ?? $user->username;
 
         return response()->json([
             'success' => true,
@@ -67,20 +90,22 @@ class PasswordController extends Controller
             'valid' => true,
             'message' => 'Reset token is valid.',
             'data' => [
-                'reset_token_expires_at' => $user->reset_token_expires_at,
-                'fullname' => $user->fullname, // ADDED THIS LINE
+                'reset_token_expires_at' => $expiresAt->toDateTimeString(),
+                'fullname' => $fullname,
             ]
         ], 200);
     }
 
     public function resetPasswordUpdate(Request $request)
     {
+
         $validator = Validator::make($request->all(), [
-            'username' => 'required|exists:users,username',
-            'token' => 'required',
+            'username' => 'required|string',
+            'token' => 'required|string',
             'new_password' => 'required|min:8|confirmed',
             'new_password_confirmation' => 'required',
             'password_update_by' => 'required|in:1,2',
+            'school_code' => 'nullable|string',
         ], [
             'password_update_by.in' => 'Invalid password update level. Must be 1 (Self-service) or 2 (Admin-assisted).',
         ]);
@@ -94,19 +119,29 @@ class PasswordController extends Controller
             ], 422);
         }
 
-        $user = User::where('username', $request->username)
-                    ->where('reset_password_token', $request->token)
-                    ->first();
+        // ✅ Fix: Include token in the query
+        $query = User::where('username', $request->username)
+            ->where('reset_password_token', $request->token);
+        
+        if ($request->has('school_code') && !empty($request->school_code)) {
+            $query->where('school_code', $request->school_code);
+        }
+        
+        $user = $query->first();
 
         if (!$user) {
             return response()->json([
                 'success' => false,
                 'status' => 401,
-                'message' => 'Invalid reset token.',
+                'message' => 'Invalid reset token or user not found.',
             ], 401);
         }
 
-        if (Carbon::now()->gt($user->reset_token_expires_at)) {
+        // ✅ Check if token has expired
+        $now = Carbon::now();
+        $expiresAt = Carbon::parse($user->reset_token_expires_at);
+        
+        if ($now->gt($expiresAt)) {
             return response()->json([
                 'success' => false,
                 'status' => 410,
@@ -117,7 +152,7 @@ class PasswordController extends Controller
         $passwordUpdateBy = $request->password_update_by;
 
         DB::table('users')
-            ->where('username', $request->username)
+            ->where('id', $user->id)
             ->update([
                 'password' => Hash::make($request->new_password),
                 'password_update_by' => $passwordUpdateBy,
@@ -127,15 +162,15 @@ class PasswordController extends Controller
                 'updated_at' => Carbon::now(),
             ]);
 
-        // CRITICAL: Only return Google redirect for LEVEL 2
+        // Only return Google redirect for LEVEL 2
         if ($passwordUpdateBy == 2) {
             return response()->json([
                 'success' => true,
                 'status' => 200,
                 'message' => 'Password Reset was successful, please give the new password to the user who requested the reset.',
-                'redirect_url' => 'https://www.google.com/', // GOOGLE REDIRECT FOR LEVEL 2
-                'is_external_redirect' => true, // Flag for frontend
-                'reset_level' => 2 // Include level for verification
+                'redirect_url' => 'https://www.google.com/',
+                'is_external_redirect' => true,
+                'reset_level' => 2
             ], 200);
         }
 
@@ -178,7 +213,7 @@ class PasswordController extends Controller
             ], 401);
         }
 
-        // ADD THIS CHECK: Verify new password is different from current password
+        // Verify new password is different from current password
         if (Hash::check($request->new_password, $user->password)) {
             return response()->json([
                 'success' => false,
@@ -188,13 +223,13 @@ class PasswordController extends Controller
             ], 422);
         }
 
-        // Update password with password_update_by = 1 (authenticated user change)
+        // Update password
         DB::table('users')
             ->where('id', $user->id)
             ->update([
                 'password' => Hash::make($request->new_password),
                 'password_update_by' => 1,
-                'updated_at' => Carbon::now(), // Explicitly update timestamp
+                'updated_at' => Carbon::now(),
             ]);
 
         return response()->json([

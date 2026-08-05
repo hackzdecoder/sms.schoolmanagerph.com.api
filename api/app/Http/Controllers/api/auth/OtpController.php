@@ -136,123 +136,123 @@ class OtpController extends Controller
    */
   public function verifyOtp(Request $request)
   {
-    $request->merge([
-      'otp_code' => trim($request->otp_code),
-      'username' => trim($request->username),
-      'school_code' => trim($request->school_code ?? ''),
-    ]);
+      $request->merge([
+          'otp_code' => trim($request->otp_code),
+          'username' => trim($request->username),
+          'school_code' => trim($request->school_code ?? ''),
+      ]);
 
-    $validator = Validator::make($request->all(), [
-      'otp_code' => 'required|digits:6',
-      'username' => 'required',
-      'school_code' => 'required|string',
-    ], [
-      'otp_code.required' => 'OTP code is required.',
-      'otp_code.digits' => 'OTP code must be 6 digits.',
-      'username.required' => 'Username is required.',
-      'school_code.required' => 'School code is required.',
-    ]);
+      $validator = Validator::make($request->all(), [
+          'otp_code' => 'required|digits:6',
+          'username' => 'required',
+          'school_code' => 'required|string',
+      ], [
+          'otp_code.required' => 'OTP code is required.',
+          'otp_code.digits' => 'OTP code must be 6 digits.',
+          'username.required' => 'Username is required.',
+          'school_code.required' => 'School code is required.',
+      ]);
 
-    if ($validator->fails()) {
-      return response()->json([
-        'success' => false,
-        'status' => 422,
-        'message' => 'Validation failed.',
-        'errors' => $validator->errors(),
-      ], 422);
-    }
+      if ($validator->fails()) {
+          return response()->json([
+              'success' => false,
+              'status' => 422,
+              'message' => 'Validation failed.',
+              'errors' => $validator->errors(),
+          ], 422);
+      }
 
-    // ✅ Find user with BOTH username AND school_code AND otp_code
-    $user = User::where('username', $request->username)
-      ->where('school_code', $request->school_code)
-      ->where('otp_code', $request->otp_code)
-      ->first();
+      // Find user with BOTH username AND school_code AND otp_code
+      $user = User::where('username', $request->username)
+          ->where('school_code', $request->school_code)
+          ->where('otp_code', $request->otp_code)
+          ->first();
 
-    if (!$user) {
-      return response()->json([
-        'success' => false,
-        'status' => 401,
-        'message' => 'Invalid OTP code or user not found for this school.',
-      ], 401);
-    }
+      if (!$user) {
+          return response()->json([
+              'success' => false,
+              'status' => 401,
+              'message' => 'Invalid OTP code or user not found for this school.',
+          ], 401);
+      }
 
-    // Check if OTP has expired
-    if (Carbon::now()->gt($user->otp_code_expired_at)) {
-      return response()->json([
-        'success' => false,
-        'status' => 410,
-        'message' => 'OTP has expired. Please request a new OTP.',
-      ], 410);
-    }
+      // Check if OTP has expired
+      if (Carbon::now()->gt($user->otp_code_expired_at)) {
+          return response()->json([
+              'success' => false,
+              'status' => 410,
+              'message' => 'OTP has expired. Please request a new OTP.',
+          ], 410);
+      }
 
-    // Check if account is active
-    if ($user->account_status !== 'active') {
-      return response()->json([
-        'success' => false,
-        'status' => 403,
-        'message' => 'Your account has been deactivated',
-        'account_status' => $user->account_status,
-      ], 403);
-    }
+      // Check if account is active
+      if ($user->account_status !== 'active') {
+          return response()->json([
+              'success' => false,
+              'status' => 403,
+              'message' => 'Your account has been deactivated',
+              'account_status' => $user->account_status,
+          ], 403);
+      }
 
-    // DETECT FLOW: Check if user already has email
-    $isFirstUserFlow = empty($user->email) || $user->email_verified_at === null;
-    $resetToken = null;
+      // DETECT FLOW: Check if user already has email
+      $isFirstUserFlow = empty($user->email) || $user->email_verified_at === null;
+      $resetToken = null;
 
-    if ($isFirstUserFlow) {
-      // FIRST-USER REGISTRATION FLOW
-      $firstUserToken = Str::random(60);
-      $tokenExpiry = Carbon::now()->addMinutes(15);
+      if ($isFirstUserFlow) {
+          // FIRST-USER REGISTRATION FLOW
+          $firstUserToken = Str::random(60);
+          $tokenExpiry = Carbon::now()->addMinutes(15);
 
-      DB::table('users')
-        ->where('id', $user->id)
-        ->update([
-          'otp_verified_at' => Carbon::now(),
-          'otp_code' => null,
-          'otp_code_expired_at' => null,
-          'first_user_token' => $firstUserToken,
-          'first_user_token_expiry_at' => $tokenExpiry,
-          'updated_at' => DB::raw('updated_at'),
-        ]);
+          DB::table('users')
+              ->where('id', $user->id)
+              ->update([
+                  'otp_verified_at' => Carbon::now(),
+                  'otp_code' => null,
+                  'otp_code_expired_at' => null,
+                  'first_user_token' => $firstUserToken,
+                  'first_user_token_expiry_at' => $tokenExpiry,
+                  'updated_at' => DB::raw('updated_at'),
+              ]);
 
-      return response()->json([
-        'success' => true,
-        'status' => 200,
-        'message' => 'OTP verified successfully. You can now proceed with registration.',
-        'data' => [
-          'username' => $user->username,
-          'email' => $user->email,
-          'email_hint' => $user->email ? substr($user->email, 0, 3) . '****' . strstr($user->email, '@') : null,
-          'first_user_token' => $firstUserToken,
-          'first_user_token_expiry_at' => $tokenExpiry->toDateTimeString(),
-        ],
-      ], 200);
-    } else {
-      // PASSWORD RESET FLOW
-      $resetToken = Str::random(60);
+          return response()->json([
+              'success' => true,
+              'status' => 200,
+              'message' => 'OTP verified successfully. You can now proceed with registration.',
+              'data' => [
+                  'username' => $user->username,
+                  'email' => $user->email,
+                  'email_hint' => $user->email ? substr($user->email, 0, 3) . '****' . strstr($user->email, '@') : null,
+                  'first_user_token' => $firstUserToken,
+                  'first_user_token_expiry_at' => $tokenExpiry->toDateTimeString(),
+              ],
+          ], 200);
+      } else {
+          // PASSWORD RESET FLOW
+          $resetToken = Str::random(60);
 
-      DB::table('users')
-        ->where('id', $user->id)
-        ->update([
-          'otp_verified_at' => Carbon::now(),
-          'otp_code' => null,
-          'otp_code_expired_at' => null,
-          'reset_password_token' => $resetToken,
-          'reset_token_expires_at' => Carbon::now()->addMinutes(5),
-          'updated_at' => DB::raw('updated_at'),
-        ]);
+          DB::table('users')
+              ->where('id', $user->id)
+              ->update([
+                  'otp_verified_at' => Carbon::now(),
+                  'otp_code' => null,
+                  'otp_code_expired_at' => null,
+                  'reset_password_token' => $resetToken,
+                  'reset_token_expires_at' => Carbon::now()->addMinutes(5),
+                  'updated_at' => DB::raw('updated_at'),
+              ]);
 
-      return response()->json([
-        'success' => true,
-        'status' => 200,
-        'message' => 'OTP verified successfully. You can now reset your password.',
-        'data' => [
-          'username' => $user->username,
-          'email_hint' => $user->email ? substr($user->email, 0, 3) . '****' . strstr($user->email, '@') : null,
-          'reset_token' => $resetToken,
-        ],
-      ], 200);
-    }
+          return response()->json([
+              'success' => true,
+              'status' => 200,
+              'message' => 'OTP verified successfully. You can now reset your password.',
+              'data' => [
+                  'username' => $user->username,
+                  'email_hint' => $user->email ? substr($user->email, 0, 3) . '****' . strstr($user->email, '@') : null,
+                  'reset_token' => $resetToken,
+              ],
+          ], 200);
+      }
   }
 
   /**
