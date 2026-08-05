@@ -133,7 +133,7 @@ class EmailController extends Controller
           return response()->json([
               'success' => false,
               'status' => 403,
-              'message' => 'Your account has been deactivated',
+              'message' => 'You have been logged out',
               'account_status' => $user->account_status,
           ], 403);
       }
@@ -242,7 +242,7 @@ class EmailController extends Controller
           return response()->json([
               'success' => false,
               'status' => 403,
-              'message' => 'Your account has been deactivated',
+              'message' => 'You have been logged out',
               'account_status' => $user->account_status,
           ], 403);
       }
