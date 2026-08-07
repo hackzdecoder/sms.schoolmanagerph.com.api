@@ -12,8 +12,9 @@ import {
   Checkbox,
   FormControlLabel,
   Stack,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material';
-import { useMediaQuery, useTheme } from '@mui/material';
 import { useRouter } from 'src/routes/hooks';
 import { Iconify } from 'src/components/iconify';
 import { api } from 'src/routes/api/config';
@@ -61,6 +62,7 @@ export function FirstUserView() {
     fullname: '',
     email: '',
     first_user_token: '',
+    school_code: '',
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -122,34 +124,38 @@ export function FirstUserView() {
 
   const handleChange = useCallback(
     (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) => {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+      const value = field === 'school_code' ? e.target.value.toUpperCase() : e.target.value;
+      setForm((prev) => ({ ...prev, [field]: value }));
       setErrors((prev) => ({ ...prev, [field]: '' }));
     },
     []
   );
 
-  const prefillUserEmail = useCallback(async (username: string) => {
-    if (hasFetchedEmailRef.current) return;
-    try {
-      const schoolCode = localStorage.getItem('user_school_code');
-      if (!schoolCode) {
+  const prefillUserEmail = useCallback(
+    async (username: string) => {
+      if (hasFetchedEmailRef.current) return;
+      try {
+        const schoolCode = form.school_code || localStorage.getItem('user_school_code');
+        if (!schoolCode) {
+          hasFetchedEmailRef.current = true;
+          return;
+        }
+        const response = await api.get<UserEmailResponse>('/get-user-email', {
+          params: { username, school_code: schoolCode },
+        });
+        if (response.data.success && response.data.data?.has_email) {
+          setForm((prev) => ({ ...prev, email: response.data.data?.email || '' }));
+          setOtpVerificationEmail(response.data.data?.email || '');
+          localStorage.setItem('first_user_email', response.data.data?.email || '');
+        }
         hasFetchedEmailRef.current = true;
-        return;
+      } catch (error) {
+        console.error('Failed to fetch user email:', error);
+        hasFetchedEmailRef.current = true;
       }
-      const response = await api.get<UserEmailResponse>('/get-user-email', {
-        params: { username, school_code: schoolCode },
-      });
-      if (response.data.success && response.data.data?.has_email) {
-        setForm((prev) => ({ ...prev, email: response.data.data?.email || '' }));
-        setOtpVerificationEmail(response.data.data?.email || '');
-        localStorage.setItem('first_user_email', response.data.data?.email || '');
-      }
-      hasFetchedEmailRef.current = true;
-    } catch (error) {
-      console.error('Failed to fetch user email:', error);
-      hasFetchedEmailRef.current = true;
-    }
-  }, []);
+    },
+    [form.school_code]
+  );
 
   const handleSendOtp = useCallback(async () => {
     if (!form.email.trim()) {
@@ -160,21 +166,24 @@ export function FirstUserView() {
       setErrors({ email: 'Invalid email address' });
       return;
     }
+    if (!form.school_code.trim()) {
+      setErrors({ school_code: 'School code is required' });
+      return;
+    }
+
+    sessionStorage.setItem('schoolCode', form.school_code.trim().toUpperCase());
 
     setIsSendingOtp(true);
     setErrors({});
     setOtpSuccessMessage('');
 
     try {
-      // ✅ Get school_code from localStorage
-      const schoolCode = localStorage.getItem('user_school_code');
-
       const response = await api.post<OtpResponse>(
         '/send-otp-first-user',
         {
           username: form.username,
           email: form.email,
-          school_code: schoolCode, // ✅ ADD school_code
+          school_code: form.school_code.trim().toUpperCase(),
         },
         { skipAuthInterceptor: true } as any
       );
@@ -183,7 +192,6 @@ export function FirstUserView() {
         setOtpVerificationEmail(form.email);
         localStorage.setItem('first_user_email', form.email);
 
-        // Use response.data.message from backend
         const successMessage = response.data.message;
         setOtpSuccessMessage(successMessage);
         setOtpSuccessDialog(true);
@@ -195,7 +203,7 @@ export function FirstUserView() {
     } finally {
       setIsSendingOtp(false);
     }
-  }, [form.email, form.username]);
+  }, [form.email, form.username, form.school_code]);
 
   const handleOtpVerified = useCallback(
     async (token?: string, expiry?: string) => {
@@ -222,17 +230,20 @@ export function FirstUserView() {
     const validateToken = async () => {
       const username = localStorage.getItem('first_user_username');
       const fullname = localStorage.getItem('first_user_fullname');
+      const schoolCode = localStorage.getItem('user_school_code') || '';
 
       if (!username) {
         router.push('/login');
         return;
       }
 
+      // ✅ Set form with school_code included
       setForm({
         username: username,
         fullname: fullname || username,
         email: '',
         first_user_token: '',
+        school_code: schoolCode,
       });
 
       await prefillUserEmail(username);
@@ -281,12 +292,13 @@ export function FirstUserView() {
 
   const validateAllFields = useCallback(() => {
     const newErrors: { [key: string]: string } = {};
-    const { username, fullname, email } = form;
+    const { username, fullname, email, school_code } = form;
     if (!username.trim()) newErrors.username = 'Username is required';
     if (!fullname.trim()) newErrors.fullname = 'Fullname is required';
     else if (fullname.trim().length < 3) newErrors.fullname = 'Must be at least 3 characters';
     if (!email.trim()) newErrors.email = 'Email is required';
     else if (!emailRegex.test(email.trim())) newErrors.email = 'Invalid email address';
+    if (!school_code.trim()) newErrors.school_code = 'School code is required';
     if (!termsAccepted) newErrors.terms = 'You must accept the Terms & Conditions';
     if (!acceptableUseAccepted)
       newErrors.acceptableUse = 'You must accept the Acceptable Use Policy';
@@ -316,7 +328,12 @@ export function FirstUserView() {
     try {
       const response = await api.post<FirstUserApiResponse>(
         '/update-first-user',
-        { username: form.username, email: form.email, first_user_token: form.first_user_token },
+        {
+          username: form.username,
+          email: form.email,
+          first_user_token: form.first_user_token,
+          school_code: form.school_code.trim().toUpperCase(),
+        },
         { skipAuthInterceptor: true } as any
       );
 
@@ -461,7 +478,7 @@ export function FirstUserView() {
         <OtpView
           username={form.username}
           email={form.email}
-          schoolCode={localStorage.getItem('user_school_code') || ''}
+          schoolCode={form.school_code || localStorage.getItem('user_school_code') || ''}
           onOtpVerified={handleOtpVerified}
         />
       </Box>
@@ -535,17 +552,30 @@ export function FirstUserView() {
           </Typography>
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 2, sm: 2.5 } }}>
+            {/* ✅ School Code - Disabled/Read-only */}
+            <TextField
+              fullWidth
+              label="School Code"
+              value={form.school_code}
+              disabled
+              size={isMobile ? 'small' : 'medium'}
+              sx={{
+                '& .MuiOutlinedInput-root': { borderRadius: 1.2 },
+                '& input': { textTransform: 'uppercase' },
+              }}
+            />
+
+            {/* ✅ Fullname - Disabled/Read-only */}
             <TextField
               fullWidth
               label="Fullname"
               value={form.fullname}
-              onChange={handleChange('fullname')}
-              error={!!errors.fullname}
-              helperText={errors.fullname}
               disabled
               size={isMobile ? 'small' : 'medium'}
               sx={{ '& .MuiOutlinedInput-root': { borderRadius: 1.2 } }}
             />
+
+            {/* ✅ Email - Editable */}
             <TextField
               fullWidth
               label="Email Address"

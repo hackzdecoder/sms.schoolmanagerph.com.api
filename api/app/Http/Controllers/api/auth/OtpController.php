@@ -55,7 +55,6 @@ class OtpController extends Controller
       ], 404);
     }
 
-    // Check if account is active
     if ($user->account_status !== 'active') {
       return response()->json([
         'success' => false,
@@ -65,7 +64,6 @@ class OtpController extends Controller
       ], 403);
     }
 
-    // Check if user has an active OTP
     $hasOtp = !empty($user->otp_code);
 
     return response()->json([
@@ -100,33 +98,58 @@ class OtpController extends Controller
    */
   private function getUserFullName($user): string
   {
-    $fullName = $user->username;
-    $schoolCode = $user->school_code ?? null;
-
-    if ($schoolCode) {
-      try {
-        $targetDatabaseName = DatabaseManager::generateDatabaseName($schoolCode);
-        $schoolDatabaseConnection = DatabaseManager::connect($targetDatabaseName);
-
-        $studentProfile = $schoolDatabaseConnection
-          ->table('student_records')
-          ->where('user_id', $user->user_id)
-          ->first();
-
-        if ($studentProfile) {
-          if (isset($studentProfile->fullname) && !empty($studentProfile->fullname)) {
-            $fullName = $studentProfile->fullname;
-          }
-        }
-
-        DatabaseManager::disconnect($targetDatabaseName);
-
-      } catch (\Exception $e) {
-        $fullName = $user->username;
+      // First, try to get fullname directly from users table if it exists
+      if (!empty($user->fullname)) {
+          return $user->fullname;
       }
-    }
 
-    return $fullName;
+      $fullName = $user->username;
+      $schoolCode = $user->school_code ?? null;
+
+      if ($schoolCode) {
+          try {
+              $targetDatabaseName = DatabaseManager::generateDatabaseName($schoolCode);
+              $schoolDatabaseConnection = DatabaseManager::connect($targetDatabaseName);
+
+              // Try multiple ways to find the student
+              $studentProfile = null;
+
+              // 1. Try by user_id
+              if (!empty($user->user_id)) {
+                  $studentProfile = $schoolDatabaseConnection
+                      ->table('student_records')
+                      ->where('user_id', $user->user_id)
+                      ->first();
+              }
+
+              // 2. If not found, try by username
+              if (!$studentProfile && !empty($user->username)) {
+                  $studentProfile = $schoolDatabaseConnection
+                      ->table('student_records')
+                      ->where('username', $user->username)
+                      ->first();
+              }
+
+              // 3. If still not found, try by student_id (if user_id is numeric)
+              if (!$studentProfile && is_numeric($user->user_id)) {
+                  $studentProfile = $schoolDatabaseConnection
+                      ->table('student_records')
+                      ->where('student_id', $user->user_id)
+                      ->first();
+              }
+
+              DatabaseManager::disconnect($targetDatabaseName);
+
+              if ($studentProfile && !empty($studentProfile->fullname)) {
+                  return $studentProfile->fullname;
+              }
+
+          } catch (\Exception $e) {
+              // Silently fall back to username
+          }
+      }
+
+      return $fullName;
   }
 
   /**
@@ -162,7 +185,6 @@ class OtpController extends Controller
           ], 422);
       }
 
-      // Find user with BOTH username AND school_code AND otp_code
       $user = User::where('username', $request->username)
           ->where('school_code', $request->school_code)
           ->where('otp_code', $request->otp_code)
@@ -176,7 +198,6 @@ class OtpController extends Controller
           ], 401);
       }
 
-      // Check if OTP has expired
       if (Carbon::now()->gt($user->otp_code_expired_at)) {
           return response()->json([
               'success' => false,
@@ -185,7 +206,6 @@ class OtpController extends Controller
           ], 410);
       }
 
-      // Check if account is active
       if ($user->account_status !== 'active') {
           return response()->json([
               'success' => false,
@@ -195,12 +215,10 @@ class OtpController extends Controller
           ], 403);
       }
 
-      // DETECT FLOW: Check if user already has email
       $isFirstUserFlow = empty($user->email) || $user->email_verified_at === null;
       $resetToken = null;
 
       if ($isFirstUserFlow) {
-          // FIRST-USER REGISTRATION FLOW
           $firstUserToken = Str::random(60);
           $tokenExpiry = Carbon::now()->addMinutes(15);
 
@@ -228,7 +246,6 @@ class OtpController extends Controller
               ],
           ], 200);
       } else {
-          // PASSWORD RESET FLOW
           $resetToken = Str::random(60);
 
           DB::table('users')
@@ -238,7 +255,7 @@ class OtpController extends Controller
                   'otp_code' => null,
                   'otp_code_expired_at' => null,
                   'reset_password_token' => $resetToken,
-                  'reset_token_expires_at' => Carbon::now()->addMinutes(5),
+                  'reset_token_expires_at' => Carbon::now()->addMinutes(15),
                   'updated_at' => DB::raw('updated_at'),
               ]);
 
@@ -299,7 +316,6 @@ class OtpController extends Controller
       ], 404);
     }
 
-    // Check if account is active
     if ($user->account_status !== 'active') {
       return response()->json([
         'success' => false,
@@ -334,9 +350,9 @@ class OtpController extends Controller
 
             Your One-Time Password (OTP) for Email Registration is: {$newOtp}
 
-            ***Please do not reply to this email.***
+            ***This is an automated notification from the SchoolMANAGER system.***
 
-            This e-mail transmission is intended only for the addressee and may contain confidential information.
+            This e-mail transmission is intended only for the addressee and may contain confidential information. Confidentiality is not waived if you are not the intended recipient of this e-mail, nor may you use, review, disclose, disseminate or copy any information contained in or attached to it. If you received this e-mail in error please delete it and any attachments and notify us immediately by reply e-mail. $companyName does not warrant that any attachments are free from viruses or other defects. You assume all liability for any loss, damage or other consequences which may arise from opening or using the attachments.
         TXT;
 
     try {
@@ -449,7 +465,9 @@ class OtpController extends Controller
 
             It is valid for the next 5 minutes.
 
-            ***Please do not reply to this email.***
+            ***This is an automated notification from the SchoolMANAGER system.***
+
+            This e-mail transmission is intended only for the addressee and may contain confidential information. Confidentiality is not waived if you are not the intended recipient of this e-mail, nor may you use, review, disclose, disseminate or copy any information contained in or attached to it. If you received this e-mail in error please delete it and any attachments and notify us immediately by reply e-mail. $companyName does not warrant that any attachments are free from viruses or other defects. You assume all liability for any loss, damage or other consequences which may arise from opening or using the attachments.
         TXT;
 
     try {
