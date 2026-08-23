@@ -628,7 +628,7 @@ export default function App({ children }: AppProps) {
           </Box>
 
           <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-            Account Deactivated
+            Session Expired
           </Typography>
 
           <Typography variant="body2" sx={{ color: 'text.secondary', mb: 3 }}>
