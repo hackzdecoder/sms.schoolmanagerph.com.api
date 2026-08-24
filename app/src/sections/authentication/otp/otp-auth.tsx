@@ -1,8 +1,8 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
-import { Box, Link, Button, TextField, Typography, Dialog } from '@mui/material';
-import { useRouter } from 'src/routes/hooks';
-import api from 'src/routes/api/config';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Box, Button, Dialog, Link, TextField, Typography } from '@mui/material';
 import { Logo } from 'src/components/logo';
+import api from 'src/routes/api/config';
+import { useRouter } from 'src/routes/hooks';
 
 interface OtpResponse {
   success: boolean;
@@ -213,7 +213,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         countdownTimerRef.current = null;
       }
     },
-    []
+    [],
   );
 
   const formatTime = useCallback((seconds: number): string => {
@@ -243,7 +243,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
       if (error) setError('');
       if (value && index < 5) inputRefs.current[index + 1]?.focus();
     },
-    [otp, otpExpired, error]
+    [otp, otpExpired, error],
   );
 
   const handleKeyDown = useCallback(
@@ -253,7 +253,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         inputRefs.current[index - 1]?.focus();
       }
     },
-    [otp, otpExpired]
+    [otp, otpExpired],
   );
 
   const clearOtpFields = useCallback((): void => {
@@ -291,7 +291,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
 
         if (firstUserToken) {
           setSuccessDialogMessage(
-            'OTP verification was successful! You can now proceed with registration.'
+            'OTP verification was successful! You can now proceed with registration.',
           );
           localStorage.setItem('first_user_token', firstUserToken);
           if (onOtpVerified) {
@@ -300,7 +300,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         } else if (passwordResetToken) {
           setResetToken(passwordResetToken);
           setSuccessDialogMessage(
-            'OTP verification was successful! You can now reset your password.'
+            'OTP verification was successful! You can now reset your password.',
           );
           if (onOtpVerified) {
             onOtpVerified();
@@ -344,7 +344,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
         handleVerify();
       }
     },
-    [otpExpired, handleVerify]
+    [otpExpired, handleVerify],
   );
 
   const handleResendOtp = useCallback(async (): Promise<void> => {
@@ -442,7 +442,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
 
     if (resetToken && username) {
       router.push(
-        `/password-reset?token=${resetToken}&username=${encodeURIComponent(username)}&level=1`
+        `/password-reset?token=${resetToken}&username=${encodeURIComponent(username)}&level=1`,
       );
     } else if (onOtpVerified) {
       // First-user flow - callback already called
