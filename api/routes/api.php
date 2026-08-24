@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\api\account_ledger\AccountBalanceDashboardController;
 use Illuminate\Support\Facades\Route;
 
 // Controllers
@@ -97,5 +98,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/register-device', [PushDeviceController::class, 'registerDevice']);
     Route::delete('/unregister-device', [PushDeviceController::class, 'unregisterDevice']);
     Route::get('/check-new', [PushDeviceController::class, 'checkNew']);
+  });
+
+
+  // Account Ledger
+  Route::prefix('account-ledger')->group(function () {
+    Route::get('/', [AccountBalanceDashboardController::class, 'index']);
+    Route::get('/summary', [AccountBalanceDashboardController::class, 'summary']);
   });
 });

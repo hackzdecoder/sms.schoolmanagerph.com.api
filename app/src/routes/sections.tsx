@@ -15,15 +15,19 @@ import { DashboardLayout } from 'src/layouts/dashboard';
 
 export const LoginPage = lazy(() => import('src/pages/login'));
 export const ResetOptions = lazy(() => import('src/pages/reset-options'));
-export const ResetPasswordRequestLvlOne = lazy(() => import('src/pages/reset-password-request-lvl-one'));
-export const ResetPasswordRequestLvlTwo = lazy(() => import('src/pages/reset-password-request-lvl-two'));
+export const ResetPasswordRequestLvlOne = lazy(
+  () => import('src/pages/reset-password-request-lvl-one')
+);
+export const ResetPasswordRequestLvlTwo = lazy(
+  () => import('src/pages/reset-password-request-lvl-two')
+);
 export const PasswordReset = lazy(() => import('src/pages/password-reset'));
 export const OtpVerification = lazy(() => import('src/pages/otp-auth'));
 export const FirstUser = lazy(() => import('src/pages/first-user'));
 
 export const DashboardPage = lazy(() => import('src/pages/dashboard'));
 export const AttendancePage = lazy(() => import('src/pages/attendance'));
-export const AccountPage = lazy(() => import('src/pages/accounts'));
+// export const AccountPage = lazy(() => import('src/pages/accounts'));
 export const GradePage = lazy(() => import('src/pages/grades'));
 export const MessagingPage = lazy(() => import('src/pages/messaging'));
 export const ProfilePage = lazy(() => import('src/pages/profile'));
@@ -32,6 +36,9 @@ export const EmailEditPassword = lazy(() => import('src/pages/password-update'))
 
 export const BlankPage = lazy(() => import('src/pages/blank'));
 export const UnderMaintenancePage = lazy(() => import('src/pages/under-maintenance'));
+
+// New Feature Route
+export const AccountPage = lazy(() => import('src/features/pages/account-ledger'));
 
 // ----------------------------------------------------------------------
 // Loading fallback
@@ -87,10 +94,10 @@ export const routesSection: RouteObject[] = [
   // Root Redirect — '/' redirects based on auth state
   {
     path: '/',
-    element: (
-      localStorage.getItem('auth_token')
-        ? <Navigate to="/dashboard" replace />
-        : <Navigate to="/login" replace />
+    element: localStorage.getItem('auth_token') ? (
+      <Navigate to="/dashboard" replace />
+    ) : (
+      <Navigate to="/login" replace />
     ),
   },
 

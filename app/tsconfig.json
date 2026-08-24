@@ -1,7 +1,8 @@
 {
   "compilerOptions": {
     "paths": {
-      "*": ["./src/*", "./*"]
+      "*": ["./src/*", "./*"],
+      "src/*": ["./src/*"]
     },
     "module": "ESNext",
     "jsx": "react-jsx",

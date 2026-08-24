@@ -2,9 +2,7 @@
 // import checker from 'vite-plugin-checker';
 // import { defineConfig } from 'vite';
 // import react from '@vitejs/plugin-react-swc';
-
 // const PORT = 3039;
-
 // export default defineConfig({
 //   base: '/',
 //   plugins: [
@@ -30,12 +28,10 @@
 //   server: { port: PORT, host: true },
 //   preview: { port: PORT, host: true },
 // });
-
-
-import path from 'path';
-import checker from 'vite-plugin-checker';
-import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
+import path from 'path';
+import { defineConfig } from 'vite';
+import checker from 'vite-plugin-checker';
 
 // ----------------------------------------------------------------------
 
@@ -62,6 +58,20 @@ export default defineConfig({
       {
         find: /^src(.+)/,
         replacement: path.resolve(process.cwd(), 'src/$1'),
+      },
+      // Add this new alias for features
+      {
+        find: /^features(.+)/,
+        replacement: path.resolve(process.cwd(), 'src/features/$1'),
+      },
+      // Add other common aliases
+      {
+        find: /^components(.+)/,
+        replacement: path.resolve(process.cwd(), 'src/components/$1'),
+      },
+      {
+        find: /^layouts(.+)/,
+        replacement: path.resolve(process.cwd(), 'src/layouts/$1'),
       },
     ],
   },
