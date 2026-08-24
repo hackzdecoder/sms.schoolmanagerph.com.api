@@ -1,9 +1,9 @@
 import axios from 'axios';
 
 // Base URL configuration
-// const API_BASE_URL = 'http://localhost:8000/api';
+const API_BASE_URL = 'http://localhost:8000/api';
 // const API_BASE_URL = 'https://production-sms.schoolmanagerph.com/api';
-const API_BASE_URL = 'https://sms.schoolmanagerph.com/api';
+// const API_BASE_URL = 'https://sms.schoolmanagerph.com/api';
 
 // Calculate APP_BASE_URL by removing '/api' from API_BASE_URL
 export const APP_BASE_URL = API_BASE_URL.replace('/api', '');
@@ -63,7 +63,7 @@ api.interceptors.response.use(
       console.error('Response error interceptor error:', interceptorError);
       return Promise.reject(error);
     }
-  }
+  },
 );
 
 export default api;
