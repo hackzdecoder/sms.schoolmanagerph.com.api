@@ -67,7 +67,9 @@ export function ResetPasswordRequestLvlOneView() {
 
         setSuccessMessage(`Check your email ${responseData.email} for the OTP`);
 
-        // Store username and school_code in sessionStorage for OTP page
+        // Store username and school_code in localStorage AND sessionStorage for OTP page
+        localStorage.setItem('otp_username', username.trim());
+        localStorage.setItem('otp_school_code', schoolCode.trim().toUpperCase());
         sessionStorage.setItem('otpUsername', username.trim());
         sessionStorage.setItem('schoolCode', schoolCode.trim().toUpperCase());
 
@@ -76,7 +78,6 @@ export function ResetPasswordRequestLvlOneView() {
         setLoading(false);
       })
       .catch((err: any) => {
-        // If server indicates redirect to login
         if (err.response?.data?.redirect_login) {
           router.push('/login');
           return;
@@ -127,9 +128,15 @@ export function ResetPasswordRequestLvlOneView() {
   // Dialog OK handler
   const handleDialogOk = useCallback((): void => {
     setOpenSuccessDialog(false);
-    // Redirect to OTP page; OTP page will load username and schoolCode from sessionStorage
+    // Store username and school_code in localStorage for the OTP page
+    localStorage.setItem('otp_username', username.trim());
+    localStorage.setItem('otp_school_code', schoolCode.trim().toUpperCase());
+    // Also store in sessionStorage for backup
+    sessionStorage.setItem('otpUsername', username.trim());
+    sessionStorage.setItem('schoolCode', schoolCode.trim().toUpperCase());
+    // Redirect to OTP page
     router.push('/otp-authentication');
-  }, [router]);
+  }, [router, username, schoolCode]);
 
   return (
     <Box

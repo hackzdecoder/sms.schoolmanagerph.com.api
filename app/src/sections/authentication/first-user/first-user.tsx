@@ -1,25 +1,25 @@
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Box,
-  Link,
   Button,
-  TextField,
-  IconButton,
-  Typography,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogContent,
-  Checkbox,
   FormControlLabel,
+  IconButton,
+  Link,
   Stack,
+  TextField,
+  Typography,
   useMediaQuery,
   useTheme,
 } from '@mui/material';
-import { useRouter } from 'src/routes/hooks';
 import { Iconify } from 'src/components/iconify';
-import { api } from 'src/routes/api/config';
-import { useTermsConditionsModal, TERMS_CONTENT } from 'src/utils/modal-terms-conditions';
 import { Logo } from 'src/components/logo';
+import { api } from 'src/routes/api/config';
+import { useRouter } from 'src/routes/hooks';
+import { TERMS_CONTENT, useTermsConditionsModal } from 'src/utils/modal-terms-conditions';
 import { OtpView } from '../otp/otp-auth';
 
 interface FirstUserApiResponse {
@@ -205,13 +205,61 @@ export function FirstUserView() {
     }
   }, [form.email, form.username, form.school_code]);
 
+  // const handleOtpVerified = useCallback(
+  //   async (token?: string, expiry?: string) => {
+  //     if (!token) {
+  //       setErrors({ submit: 'OTP verification failed' });
+  //       setShowOtpVerification(false);
+  //       return;
+  //     }
+  //     setOtpVerified(true);
+  //     localStorage.setItem('first_user_otp_verified', 'true');
+  //     setShowOtpVerification(false);
+  //     localStorage.setItem('first_user_token', token);
+  //     setForm((prev) => ({ ...prev, first_user_token: token }));
+  //     if (expiry) {
+  //       localStorage.setItem('first_user_token_expiry_at', expiry);
+  //     }
+  //     startCountdown(15 * 60);
+  //     setShowCountdown(true);
+  //   },
+  //   [startCountdown]
+  // );
+
   const handleOtpVerified = useCallback(
-    async (token?: string, expiry?: string) => {
+    async (token?: string, expiry?: string, resetToken?: string) => {
+      console.log('🔍 handleOtpVerified called with:', { token, expiry, resetToken });
+
+      // If we received a reset_token, this is a password reset flow
+      if (resetToken) {
+        console.log('✅ Reset token detected');
+        // Get the username from localStorage or form
+        const username = localStorage.getItem('first_user_username') || form.username;
+        const schoolCode = localStorage.getItem('user_school_code') || form.school_code;
+
+        // Clear first-user session data
+        localStorage.removeItem('first_user_username');
+        localStorage.removeItem('first_user_fullname');
+        localStorage.removeItem('first_user_otp_verified');
+        localStorage.removeItem('first_user_email');
+        localStorage.removeItem('first_user_token');
+
+        // Navigate to password reset
+        router.push(
+          `/password-reset?token=${resetToken}&username=${encodeURIComponent(username)}&level=1&school_code=${encodeURIComponent(schoolCode)}`
+        );
+        return;
+      }
+
+      // Handle first-user flow (original logic)
       if (!token) {
+        console.log('❌ No token found');
         setErrors({ submit: 'OTP verification failed' });
         setShowOtpVerification(false);
         return;
       }
+
+      console.log('✅ First-user token detected');
       setOtpVerified(true);
       localStorage.setItem('first_user_otp_verified', 'true');
       setShowOtpVerification(false);
@@ -223,7 +271,7 @@ export function FirstUserView() {
       startCountdown(15 * 60);
       setShowCountdown(true);
     },
-    [startCountdown]
+    [startCountdown, router, form.username, form.school_code]
   );
 
   useEffect(() => {
@@ -475,6 +523,12 @@ export function FirstUserView() {
   if (showOtpVerification) {
     return (
       <Box sx={{ position: 'fixed', inset: 0, bgcolor: '#f4f6f8' }}>
+        {/* <OtpView
+          username={form.username}
+          email={form.email}
+          schoolCode={form.school_code || localStorage.getItem('user_school_code') || ''}
+          onOtpVerified={handleOtpVerified}
+        /> */}
         <OtpView
           username={form.username}
           email={form.email}
