@@ -55,9 +55,7 @@ Route::post('/trademarks', [TrademarksController::class, 'getTrademarksInfo']);
 
 Route::get('/school-identification', [SchoolController::class, 'getSchool']);
 
-Route::post('/test', function () {
-  return ['data'];
-});
+
 
 // ----------------------------
 // PROTECTED ROUTES
@@ -110,6 +108,10 @@ Route::middleware('auth:sanctum')->group(function () {
   // ACCOUNT LEDGER ROUTES
   // ============================================================
   Route::prefix('account-ledger')->group(function () {
+    Route::post('/test', function () {
+      return ['data'];
+    });
+    
     // Existing routes
     Route::get('/', [AccountBalanceDashboardController::class, 'index']);
     Route::get('/summary', [AccountBalanceDashboardController::class, 'summary']);
