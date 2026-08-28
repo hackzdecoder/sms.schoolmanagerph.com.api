@@ -15,7 +15,6 @@ use App\Http\Controllers\api\messages\MessagesController;
 use App\Http\Controllers\api\auth\OtpController;
 use App\Http\Controllers\api\notifications\PushDeviceController;
 use App\Http\Controllers\api\school\SchoolController;
-use Illuminate\Support\Facades\Auth;
 
 /*
 |--------------------------------------------------------------------------
@@ -62,19 +61,6 @@ Route::get('/school-identification', [SchoolController::class, 'getSchool']);
 Route::get('/test-public', function () {
     return ['message' => 'Public route works!'];
 });
-
-// Route::get('/test-user', function () {
-//     $user = App\Models\User::where('user_id', '09459759771')->first();
-//     return response()->json([
-//         'user' => $user ? [
-//             'id' => $user->id,
-//             'user_id' => $user->user_id,
-//             'school_code' => $user->school_code,
-//             'fullname' => $user->fullname,
-//         ] : null
-//     ]);
-// });
-// ============================================================
 
 // ----------------------------
 // PROTECTED ROUTES
@@ -127,37 +113,6 @@ Route::middleware('auth:sanctum')->group(function () {
   // ACCOUNT LEDGER ROUTES
   // ============================================================
   Route::prefix('account-ledger')->group(function () {
-  //   Route::get('/test', function () {
-  //     return ['data'];
-  //   });
-
-  //   Route::get('/debug', function () {
-  //     try {
-  //         $user = Auth::user();
-          
-  //         if (!$user) {
-  //             return response()->json(['error' => 'No user'], 401);
-  //         }
-          
-  //         return response()->json([
-  //             'user' => [
-  //                 'id' => $user->id,
-  //                 'user_id' => $user->user_id,
-  //                 'school_code' => $user->school_code,
-  //                 'email' => $user->email,
-  //                 'fullname' => $user->fullname,
-  //             ],
-  //             'has_school_code' => !empty($user->school_code),
-  //             'school_code_value' => $user->school_code ?? 'null',
-  //         ]);
-  //     } catch (\Exception $e) {
-  //         return response()->json([
-  //             'error' => $e->getMessage(),
-  //             'line' => $e->getLine(),
-  //             'file' => $e->getFile(),
-  //         ], 500);
-  //     }
-  // });
   
     Route::get('/', [AccountBalanceDashboardController::class, 'index']);
     Route::get('/summary', [AccountBalanceDashboardController::class, 'summary']);
