@@ -275,6 +275,7 @@ class AccountBalanceDashboardController extends Controller
             
             $studentRecord = DB::connection($databaseName)
                 ->table('student_records')
+                ->where('school_code', $schoolCode)
                 ->where('user_id', $user->user_id)
                 ->orWhere('email', $user->email)
                 ->first();
@@ -308,7 +309,7 @@ class AccountBalanceDashboardController extends Controller
         return [
             'total' => floatval($total),
             'formatted' => '₱' . number_format(floatval($total), 2),
-            'records' => $records,  // ← This contains all the data including enrollment_number, level, section_course
+            'records' => $records,
             'count' => $records->count(),
         ];
     }
