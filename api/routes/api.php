@@ -15,6 +15,7 @@ use App\Http\Controllers\api\messages\MessagesController;
 use App\Http\Controllers\api\auth\OtpController;
 use App\Http\Controllers\api\notifications\PushDeviceController;
 use App\Http\Controllers\api\school\SchoolController;
+use Illuminate\Support\Facades\Auth;
 
 /*
 |--------------------------------------------------------------------------
@@ -108,10 +109,38 @@ Route::middleware('auth:sanctum')->group(function () {
   // ACCOUNT LEDGER ROUTES
   // ============================================================
   Route::prefix('account-ledger')->group(function () {
-    Route::post('/test', function () {
+    Route::get('/test', function () {
       return ['data'];
     });
-    
+
+    Route::get('/debug', function () {
+      try {
+          $user = Auth::user();
+          
+          if (!$user) {
+              return response()->json(['error' => 'No user'], 401);
+          }
+          
+          return response()->json([
+              'user' => [
+                  'id' => $user->id,
+                  'user_id' => $user->user_id,
+                  'school_code' => $user->school_code,
+                  'email' => $user->email,
+                  'fullname' => $user->fullname,
+              ],
+              'has_school_code' => !empty($user->school_code),
+              'school_code_value' => $user->school_code ?? 'null',
+          ]);
+      } catch (\Exception $e) {
+          return response()->json([
+              'error' => $e->getMessage(),
+              'line' => $e->getLine(),
+              'file' => $e->getFile(),
+          ], 500);
+      }
+  });
+
     // Existing routes
     Route::get('/', [AccountBalanceDashboardController::class, 'index']);
     Route::get('/summary', [AccountBalanceDashboardController::class, 'summary']);
