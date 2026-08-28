@@ -131,6 +131,22 @@ class AccountBalanceDashboardController extends Controller
             }
 
             $studentId = $this->getStudentId($user, $request, $schoolCode);
+
+            // --- DEBUG ---
+            return new JsonResponse([
+                'status' => true,
+                'debug' => [
+                    'user_id' => $user->user_id,
+                    'email' => $user->email,
+                    'school_code_from_user' => $user->school_code,
+                    'school_code_found' => $schoolCode,
+                    'student_id_found' => $studentId,
+                    'database_name' => DatabaseManager::generateDatabaseName($schoolCode),
+                ]
+            ], 200);
+            // --- END DEBUG ---
+
+            // The rest of the code will only execute if we remove the debug return above
             if (!$studentId) {
                 return new JsonResponse([
                     'status' => false,
@@ -262,12 +278,10 @@ class AccountBalanceDashboardController extends Controller
 
     private function getStudentId($user, Request $request, string $schoolCode): ?string
     {
-        // If student_id is passed in request, use it
         if ($request->has('student_id')) {
             return $request->get('student_id');
         }
 
-        // If user object has student_id, use it
         if (isset($user->student_id) && $user->student_id) {
             return $user->student_id;
         }
@@ -276,7 +290,7 @@ class AccountBalanceDashboardController extends Controller
             $databaseName = DatabaseManager::generateDatabaseName($schoolCode);
             DatabaseManager::connect($databaseName);
             
-            // Try to find by user_id with school_code match (most specific)
+            // First: Try to find by user_id with school_code
             $studentRecord = DB::connection($databaseName)
                 ->table('student_records')
                 ->where('school_code', $schoolCode)
@@ -287,7 +301,7 @@ class AccountBalanceDashboardController extends Controller
                 return $studentRecord->student_id;
             }
 
-            // If not found, try by email with school_code
+            // Second: Try by email with school_code
             if (isset($user->email) && $user->email) {
                 $studentRecord = DB::connection($databaseName)
                     ->table('student_records')
@@ -300,7 +314,7 @@ class AccountBalanceDashboardController extends Controller
                 }
             }
 
-            // Try by mobile_number with school_code
+            // Third: Try by mobile_number with school_code
             if (isset($user->user_id) && $user->user_id) {
                 $studentRecord = DB::connection($databaseName)
                     ->table('student_records')
@@ -313,7 +327,7 @@ class AccountBalanceDashboardController extends Controller
                 }
             }
 
-            // Try by user_id without school_code (fallback)
+            // Fourth: Try by user_id without school_code (fallback)
             $studentRecord = DB::connection($databaseName)
                 ->table('student_records')
                 ->where('user_id', $user->user_id)
@@ -323,7 +337,7 @@ class AccountBalanceDashboardController extends Controller
                 return $studentRecord->student_id;
             }
 
-            // Try by email without school_code (fallback)
+            // Fifth: Try by email without school_code (fallback)
             if (isset($user->email) && $user->email) {
                 $studentRecord = DB::connection($databaseName)
                     ->table('student_records')
@@ -340,6 +354,7 @@ class AccountBalanceDashboardController extends Controller
                 'user_id' => $user->user_id ?? 'null',
                 'email' => $user->email ?? 'null',
                 'school_code' => $schoolCode,
+                'database' => $databaseName,
             ]);
 
         } catch (\Exception $e) {
