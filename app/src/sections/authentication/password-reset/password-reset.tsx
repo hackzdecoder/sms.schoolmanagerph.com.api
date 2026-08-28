@@ -1,18 +1,18 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Box,
   Button,
-  TextField,
-  IconButton,
-  Typography,
-  InputAdornment,
-  Dialog,
   CircularProgress,
+  Dialog,
+  IconButton,
+  InputAdornment,
+  TextField,
+  Typography,
 } from '@mui/material';
-import { useRouter } from 'src/routes/hooks';
 import { Iconify } from 'src/components/iconify';
-import api from 'src/routes/api/config';
 import { Logo } from 'src/components/logo';
+import api from 'src/routes/api/config';
+import { useRouter } from 'src/routes/hooks';
 
 interface ResetPasswordResponse {
   success: boolean;
@@ -35,7 +35,7 @@ export function PasswordResetView() {
   const router = useRouter();
 
   const [username, setUsername] = useState<string>('');
-  const [schoolCode, setSchoolCode] = useState<string>(''); // ✅ Added
+  const [schoolCode, setSchoolCode] = useState<string>('');
   const [fullname, setFullname] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [confirmPassword, setConfirmPassword] = useState<string>('');
@@ -58,7 +58,7 @@ export function PasswordResetView() {
   const tokenParam = queryParams.get('token') || '';
   const usernameParam = queryParams.get('username') || '';
   const levelParam = queryParams.get('level') || '1';
-  const schoolCodeParam = queryParams.get('school_code') || ''; // ✅ Added
+  const schoolCodeParam = queryParams.get('school_code') || '';
 
   const storageKey = `reset_timer_${usernameParam}_${tokenParam}`;
 
@@ -128,7 +128,7 @@ export function PasswordResetView() {
       }
       return `${seconds}s`;
     },
-    [resetLevel]
+    [resetLevel],
   );
 
   const saveTimerState = useCallback(
@@ -140,12 +140,12 @@ export function PasswordResetView() {
         expiryTime: expiryTime?.toISOString(),
         lastUpdated: new Date().toISOString(),
         resetLevel: parseInt(levelParam) || 1,
-        schoolCode: schoolCodeParam, // ✅ Save schoolCode
+        schoolCode: schoolCodeParam,
       };
 
       localStorage.setItem(storageKey, JSON.stringify(timerData));
     },
-    [tokenParam, usernameParam, levelParam, storageKey, schoolCodeParam]
+    [tokenParam, usernameParam, levelParam, storageKey, schoolCodeParam],
   );
 
   const loadTimerState = useCallback((): {
@@ -177,6 +177,34 @@ export function PasswordResetView() {
   const clearTimerState = useCallback(() => {
     localStorage.removeItem(storageKey);
   }, [storageKey]);
+
+  const clearAllAuthData = useCallback(() => {
+    // Clear OTP data
+    localStorage.removeItem('otp_username');
+    localStorage.removeItem('otp_school_code');
+    sessionStorage.removeItem('otpUsername');
+    sessionStorage.removeItem('schoolCode');
+
+    // Clear first-user data
+    localStorage.removeItem('first_user_username');
+    localStorage.removeItem('first_user_fullname');
+    localStorage.removeItem('first_user_otp_verified');
+    localStorage.removeItem('first_user_email');
+    localStorage.removeItem('first_user_token');
+    localStorage.removeItem('first_user_token_expiry_at');
+
+    // Clear user school code
+    localStorage.removeItem('user_school_code');
+
+    // 🔥 Clear user object
+    localStorage.removeItem('user');
+
+    // Clear fullname cache
+    localStorage.removeItem(`fullname_${usernameParam}_${tokenParam}`);
+
+    // Clear timer state
+    clearTimerState();
+  }, [usernameParam, tokenParam, clearTimerState]);
 
   useEffect(() => {
     if (!tokenExpiryTime || tokenExpired || remainingSeconds <= 0) {
@@ -227,13 +255,13 @@ export function PasswordResetView() {
 
           const calculatedRemainingSeconds = Math.max(
             0,
-            savedState.remainingSeconds - timeSinceLastUpdate
+            savedState.remainingSeconds - timeSinceLastUpdate,
           );
 
           if (calculatedRemainingSeconds > 0) {
             const currentLevel = parseInt(levelParam) || 1;
             setUsername(usernameParam);
-            setSchoolCode(savedState.schoolCode || schoolCodeParam || ''); // ✅ Set schoolCode
+            setSchoolCode(savedState.schoolCode || schoolCodeParam || '');
 
             const savedFullname = localStorage.getItem(`fullname_${usernameParam}_${tokenParam}`);
             setFullname(savedFullname || usernameParam);
@@ -248,7 +276,6 @@ export function PasswordResetView() {
           }
         }
 
-        // ✅ Send school_code in validation request
         const res = await api.get<ValidateLinkResponse>('/validate-reset-link', {
           params: {
             username: usernameParam,
@@ -265,7 +292,7 @@ export function PasswordResetView() {
         } else {
           const currentLevel = parseInt(levelParam) || 1;
           setUsername(usernameParam);
-          setSchoolCode(schoolCodeParam); // ✅ Set schoolCode
+          setSchoolCode(schoolCodeParam);
 
           if (res.data.data?.fullname) {
             setFullname(res.data.data.fullname);
@@ -288,7 +315,7 @@ export function PasswordResetView() {
             if (initialSeconds <= 0) {
               setTokenExpired(true);
               setLinkErrorMessage(
-                'This password reset link has expired. Please request a new one.'
+                'This password reset link has expired. Please request a new one.',
               );
               setLinkExpiredDialogOpen(true);
               clearTimerState();
@@ -327,7 +354,7 @@ export function PasswordResetView() {
           }
         } else {
           setLinkErrorMessage(
-            err?.response?.data?.message || 'This link has expired or is invalid.'
+            err?.response?.data?.message || 'This link has expired or is invalid.',
           );
           setTokenExpired(true);
           const currentLevel = parseInt(levelParam) || 1;
@@ -361,7 +388,7 @@ export function PasswordResetView() {
         clearTimerState();
       }
     },
-    [tokenExpired, clearTimerState]
+    [tokenExpired, clearTimerState],
   );
 
   const validateAllFields = useCallback(() => {
@@ -402,7 +429,7 @@ export function PasswordResetView() {
 
       setErrors(newErrors);
     },
-    [errors, password]
+    [errors, password],
   );
 
   const handleReset = useCallback(async () => {
@@ -424,19 +451,20 @@ export function PasswordResetView() {
         new_password: password,
         new_password_confirmation: confirmPassword,
         password_update_by: parseInt(levelParam) || 1,
-        school_code: schoolCode, // ✅ Send school_code
+        school_code: schoolCode,
       };
 
       const res = await api.post<ResetPasswordResponse>('/reset-password-update', payload);
 
       if (res.data.success) {
+        // 🔥 Clear all authentication data on successful password reset
+        clearAllAuthData();
+
         setTokenExpired(true);
         setRemainingSeconds(0);
-        clearTimerState();
 
         setPassword('');
         setConfirmPassword('');
-        localStorage.removeItem(`fullname_${usernameParam}_${tokenParam}`);
 
         const isLevelTwo = parseInt(levelParam) === 2;
         const hasGoogleRedirect = res.data.redirect_url === 'https://www.google.com/';
@@ -463,11 +491,10 @@ export function PasswordResetView() {
         setTokenExpired(true);
         setRemainingSeconds(0);
         setLinkErrorMessage(
-          'This password reset link has already been used. Please request a new one.'
+          'This password reset link has already been used. Please request a new one.',
         );
         setLinkExpiredDialogOpen(true);
-        clearTimerState();
-        localStorage.removeItem(`fullname_${usernameParam}_${tokenParam}`);
+        clearAllAuthData();
 
         if (parseInt(levelParam) === 2) {
           setResetLevel(2);
@@ -490,19 +517,18 @@ export function PasswordResetView() {
     validateAllFields,
     tokenExpired,
     levelParam,
-    clearTimerState,
     router,
-    usernameParam,
-    schoolCode, // ✅ Added to dependencies
+    schoolCode,
+    clearAllAuthData,
   ]);
 
   const handleSuccessClose = () => {
     setSuccessDialogOpen(false);
     setTokenExpired(true);
     setRemainingSeconds(0);
-    clearTimerState();
 
-    localStorage.removeItem(`fullname_${usernameParam}_${tokenParam}`);
+    // 🔥 Clear all data on success close
+    clearAllAuthData();
 
     const isLevelTwo = parseInt(levelParam) === 2;
 
@@ -516,7 +542,8 @@ export function PasswordResetView() {
   const handleLinkExpiredClose = () => {
     setLinkExpiredDialogOpen(false);
 
-    localStorage.removeItem(`fullname_${usernameParam}_${tokenParam}`);
+    // 🔥 Clear all data on link expired
+    clearAllAuthData();
 
     if (resetLevel === 2) {
       window.location.href = 'https://www.google.com/';
@@ -532,7 +559,7 @@ export function PasswordResetView() {
       if (field === 'confirmPassword') setConfirmPassword(value);
       if (touched[field]) validateField(field, value);
     },
-    [touched, validateField]
+    [touched, validateField],
   );
 
   const handleFieldBlur = useCallback(
@@ -541,7 +568,7 @@ export function PasswordResetView() {
       const value = field === 'password' ? password : confirmPassword;
       validateField(field, value);
     },
-    [password, confirmPassword, validateField]
+    [password, confirmPassword, validateField],
   );
 
   if (isValidating) {

@@ -11,31 +11,24 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('prepaid_account_transactions', function (Blueprint $table) {
+        Schema::create('prepaid_account_balance', function (Blueprint $table) {
             // Primary key
             $table->id();
             
             // User and school identification
-            $table->string('userid', 20)->nullable();
+            $table->string('user_id', 20)->nullable();
             $table->string('school_code', 20)->nullable();
             
             // Student information
             $table->string('student_id', 20)->nullable();
             $table->string('student_name', 255)->nullable();
             
-            // Academic details
-            $table->string('school_year', 20)->nullable();
-            $table->string('school_term', 20)->nullable();
+            // Prepaid balance details
+            $table->decimal('prepaid_balance', 20, 2)->default(0.00);
             
-            // Transaction details
-            $table->string('transaction_type', 50)->nullable();
-            $table->string('item_description', 255)->nullable();
-            $table->decimal('item_amount', 20, 2)->default(0.00);
-            $table->decimal('post_prepaid_balance', 20, 2)->default(0.00);
-            
-            // Transaction tracking
-            $table->dateTime('transaction_date')->nullable();
-            $table->string('transaction_reference', 20)->nullable();
+            // Payment tracking
+            $table->date('last_reload_date')->nullable();
+            $table->string('last_reference_number', 20)->nullable();
             
             // Timestamps
             $table->timestamps();
@@ -46,18 +39,14 @@ return new class extends Migration
             // ============================================================
             // INDEXES
             // ============================================================
-            $table->index('userid');
+            $table->index('user_id');
             $table->index('student_id');
             $table->index('school_code');
-            $table->index('school_year');
             $table->index('status');
-            $table->index('transaction_type');
-            $table->index('transaction_date');
             
             // Composite indexes
             $table->index(['school_code', 'student_id']);
             $table->index(['school_code', 'status']);
-            $table->index(['student_id', 'transaction_date']);
         });
     }
 
@@ -66,6 +55,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('prepaid_account_transactions');
+        Schema::dropIfExists('prepaid_account_balance');
     }
 };

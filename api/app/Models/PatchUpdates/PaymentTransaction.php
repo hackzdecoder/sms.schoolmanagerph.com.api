@@ -12,7 +12,7 @@ class PaymentTransaction extends SchoolBaseModel
     protected $table = 'payment_transactions';
 
     protected $fillable = [
-        'userid',
+        'user_id',
         'school_code',
         'student_id',
         'student_name',

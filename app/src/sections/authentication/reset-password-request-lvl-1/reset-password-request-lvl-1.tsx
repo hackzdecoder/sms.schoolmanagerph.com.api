@@ -1,8 +1,8 @@
-import { useState, useCallback } from 'react';
-import { Box, Link, Button, TextField, Typography, Dialog } from '@mui/material';
-import { useRouter } from 'src/routes/hooks';
-import api from 'src/routes/api/config';
+import { useCallback, useState } from 'react';
+import { Box, Button, Dialog, Link, TextField, Typography } from '@mui/material';
 import { Logo } from 'src/components/logo';
+import api from 'src/routes/api/config';
+import { useRouter } from 'src/routes/hooks';
 
 interface Errors {
   username?: string;
@@ -43,7 +43,7 @@ export function ResetPasswordRequestLvlOneView() {
       }
       setErrors(newErrors);
     },
-    [errors]
+    [errors],
   );
 
   // Handle reset password request
@@ -67,7 +67,9 @@ export function ResetPasswordRequestLvlOneView() {
 
         setSuccessMessage(`Check your email ${responseData.email} for the OTP`);
 
-        // Store username and school_code in sessionStorage for OTP page
+        // Store username and school_code in localStorage AND sessionStorage for OTP page
+        localStorage.setItem('otp_username', username.trim());
+        localStorage.setItem('otp_school_code', schoolCode.trim().toUpperCase());
         sessionStorage.setItem('otpUsername', username.trim());
         sessionStorage.setItem('schoolCode', schoolCode.trim().toUpperCase());
 
@@ -76,7 +78,6 @@ export function ResetPasswordRequestLvlOneView() {
         setLoading(false);
       })
       .catch((err: any) => {
-        // If server indicates redirect to login
         if (err.response?.data?.redirect_login) {
           router.push('/login');
           return;
@@ -99,7 +100,7 @@ export function ResetPasswordRequestLvlOneView() {
         handleRequestReset();
       }
     },
-    [handleRequestReset]
+    [handleRequestReset],
   );
 
   // Handle input change
@@ -111,7 +112,7 @@ export function ResetPasswordRequestLvlOneView() {
         if (field === 'school_code') setSchoolCode(value.toUpperCase());
         if (touched[field]) validateField(field, value);
       },
-    [touched, validateField]
+    [touched, validateField],
   );
 
   // Handle input blur
@@ -121,15 +122,29 @@ export function ResetPasswordRequestLvlOneView() {
       const value = field === 'username' ? username : schoolCode;
       validateField(field, value);
     },
-    [username, schoolCode, validateField]
+    [username, schoolCode, validateField],
   );
 
   // Dialog OK handler
   const handleDialogOk = useCallback((): void => {
     setOpenSuccessDialog(false);
-    // Redirect to OTP page; OTP page will load username and schoolCode from sessionStorage
+
+    // Clear old data from previous sessions
+    localStorage.removeItem('first_user_username');
+    localStorage.removeItem('first_user_fullname');
+    localStorage.removeItem('first_user_otp_verified');
+    localStorage.removeItem('first_user_email');
+    localStorage.removeItem('first_user_token');
+    localStorage.removeItem('first_user_token_expiry_at');
+
+    // Store fresh OTP data
+    localStorage.setItem('otp_username', username.trim());
+    localStorage.setItem('otp_school_code', schoolCode.trim().toUpperCase());
+    sessionStorage.setItem('otpUsername', username.trim());
+    sessionStorage.setItem('schoolCode', schoolCode.trim().toUpperCase());
+
     router.push('/otp-authentication');
-  }, [router]);
+  }, [router, username, schoolCode]);
 
   return (
     <Box

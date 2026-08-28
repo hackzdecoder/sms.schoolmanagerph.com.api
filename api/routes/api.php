@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\api\account_ledger\AccountBalanceDashboardController;
+use App\Http\Controllers\api\account_ledger\AccountLedgerController;
 use Illuminate\Support\Facades\Route;
 
 // Controllers
@@ -101,9 +102,18 @@ Route::middleware('auth:sanctum')->group(function () {
   });
 
 
-  // Account Ledger
+  // ============================================================
+  // ACCOUNT LEDGER ROUTES
+  // ============================================================
   Route::prefix('account-ledger')->group(function () {
+    // Existing routes
     Route::get('/', [AccountBalanceDashboardController::class, 'index']);
     Route::get('/summary', [AccountBalanceDashboardController::class, 'summary']);
+    
+    // New routes for Account Ledger
+    Route::get('/details', [AccountLedgerController::class, 'details']);
+    Route::get('/semesters', [AccountLedgerController::class, 'semesters']);
+    Route::get('/transactions', [AccountLedgerController::class, 'transactions']);
+    Route::get('/payment-history', [AccountLedgerController::class, 'paymentHistory']);
   });
 });

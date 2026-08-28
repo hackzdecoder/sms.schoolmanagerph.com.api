@@ -195,8 +195,8 @@ class OtpController extends Controller
           ], 403);
       }
 
-      // DETECT FLOW: Check if user already has email
-      $isFirstUserFlow = empty($user->email) || $user->email_verified_at === null;
+      // $isFirstUserFlow = empty($user->email) || $user->email_verified_at === null;
+      $isFirstUserFlow = $request->has('email') && !empty($request->email);
       $resetToken = null;
 
       if ($isFirstUserFlow) {

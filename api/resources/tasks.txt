@@ -1,0 +1,132 @@
+we will double check, this is the instructions
+
+1.) SchoolMANAGER ACCOUNTS PAGE
+STATISTICAL APPLETS
+1. Previous Account Balance - clickable
+2. Current Enrollment Fee Balance - clickable
+3. Total Current Installment Balance - clickable
+4. Other Fees Account Balance - clickable
+5. Total Account Balance - clickable
+6. Prepaid Account Available Balance - clickable
+7. Current Installment Account Dues - clickable
+8. Current Overdue Installment Accounts - clickable
+
+Notes:
+Previous Account Balance applet displays the Summation (Total) of all the Unpaid Balance/s in the Previous School
+Year/s.
+Current Enrollment Fee Balance applet displays the Unpaid Balance in the Current School Year’s Enrollment Fees.
+Total Current Installment Balance applet displays the Summation (Total) of all the Unpaid Monthly Balance/s in the
+Current School Year (12 Months from June to May)
+Other Fees Account Balance applet displays the Summation (Total) of all the Unpaid Balance/s on Other Fees in the
+system.
+Total Account Balance applet displays the Sum of the Student’s Previous Account Balance, Current Enrollment Balance,
+Total Current Installment Balance, and Total Other Fees Account Balances.
+Prepaid Account Available Balance applet displays the current Available Balance on the Student’s Prepaid Account.
+Current Installment Account Dues applet displays the current amount dues and its due date (for the Current School
+Year) relative to the date of the system and the installment due dates in the database.
+Current Overdue Installment Accounts applet displays the amount of overdue monthly installments (for the Current
+School Year) relative to the date of the system and the installment due dates in the database. Records will be based on
+the monthly dues that has an overdue status in the monthly_account_balance table.
+
+2.) PREVIOUS ACCOUNT BALANCE
+This is clickable and must display the following data in a separate screen/page.
+Description: This is the Unpaid Account Balance for the Previous School Years.
+Data to be displayed when the Applet is clicked should have a record status of active.
+Column Names Data Source (Field Name)
+a. School Year school_year
+b. Enrollment Number enrollment_number
+c. Level level
+d. Section section_course
+e. Total Amount original_amount
+f. Amount Paid paid_amount
+g. Remaining Balance account_balance
+
+
+3.) CURRENT ENROLLMENT FEE BALANCE
+This is clickable and must display the following data in a modal screen.
+Description: This is the Unpaid Enrollment Balance for the Current School Year.
+Data to be displayed when the Applet is clicked should have a record status of active.
+Column Names Data Source (Field Name)
+a. School Year school_year
+b. Enrollment Number enrollment_number
+c. Level level
+d. Section section_course
+e. Total Amount original_amount
+f. Amount Paid paid_amount
+g. Remaining Balance account_balance
+
+4.) TOTAL CURRENT INSTALLMENT BALANCE
+This is clickable and must display the following data in a separate screen/page.
+Description: This is the Unpaid Installment Account Balances (per Month) for the Current School Year.
+Data to be displayed when the Applet is clicked should have a record status of active.
+Column Names Data Source (Field Name)
+a. School Year school_year
+b. Enrollment Number enrollment_number
+c. Level level
+d. Section section_course
+e. Month 1 Account month_1_duedate note: Column Name must be renamed based on the
+month value of the due date
+
+ex. if due date is 2026-07-05 then Month 1
+Account Label should be July
+
+f. Month 1 Amount month_1_orig_amount
+g. Month 1 Paid Amount month_1_paid_amount
+h. Month 1 Balance month_1_account_balance
+i. Month 1 Status month_1_status
+Note: Repeat letter e to i for Months 2 to 10
+
+
+5.) OTHER FEES ACCOUNT BALANCE
+This is clickable and must display the following data in a separate screen/page.
+Description: This is the Unpaid Account Balance for the Previous School Years.
+Data to be displayed when the Applet is clicked should have a record status of active.
+Column Names Data Source (Field Name)
+a. School Year school_year
+b. Description of Fees fee_name
+c. Total Amount of Fees original_amount
+d. Discount discount
+e. Amount Paid paid_amount
+f. Remaining Balance account_balance
+
+
+6.) TOTAL ACCOUNT BALANCE
+This is clickable and must display the following data in a separate modal screen.
+Description: This is the sum of the Unpaid Account Balances (Previous Account Balance, Current Enrollment
+Balance, Total Current Installment Balance, and Total Other Fees Account Balances).
+Data to be displayed when the Applet is clicked should be fetched in the tables for each type of accounts.
+Column Names Data Source (Field Name)
+a. Previous School Year Account Sum of all Previous School Year Account Balances
+b. Current Enrollment Balance Amount of Current Enrollment Balance
+c. Total Current SY Installment Total Amount of all the Unpaid Monthly Dues
+d. Total Balances on Other Fees Sum of all the Unpaid Account Balances on Other Fees
+e. Total Outstanding Account Balance Total of a, b, c, and d
+
+
+7.) PREPAID ACCOUNT AVAILABLE BALANCE
+This is clickable and must display the following data in a separate screen/page.
+A. AVAILABLE PREPAID ACCOUNT BALANCE
+Description: This is the Details of the Available Balance of the Student’s Prepaid Account.
+Column Names Data Source (Field Name)
+a. Account Name student_name
+b. Account Number student_id
+c. Available Balance prepaid_balance
+
+
+8.) PREAPAID ACCOUNT TRANSACTION HISTORY
+Description: This is the Details of all the Available Transactions related to the Student’s Prepaid Account.
+Column Names Data Source (Field Name)
+a. Date transaction_date
+b. Transaction Type transaction_type
+c. Description item_description
+d. Amount item_amount
+
+
+9.) PAYMENT TRANSACTIONS / HISTORY
+Description: This is the Detailed Payment Transaction Records of the selected student. Records that should be
+displayed should only have an active status
+Column Names Data Source (Field Name)
+a. Date payment_date
+b. Reference transaction_reference
+c. Payment Type payment_method
+d. Amount payment_amount

@@ -2,17 +2,19 @@
 
 namespace App\Models\PatchUpdates;
 
-use App\Models\PatchUpdates\Base\SchoolBaseModel;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 
-class PreviousSyAccountBalance extends SchoolBaseModel
+class PreviousSyAccountBalance extends Model
 {
     use HasFactory;
 
     protected $table = 'previous_sy_account_balance';
+    
+    protected $connection = 'users_main';
 
     protected $fillable = [
-        'userid',
+        'user_id',
         'school_code',
         'student_id',
         'student_name',
@@ -37,4 +39,24 @@ class PreviousSyAccountBalance extends SchoolBaseModel
         'paid_amount' => 'decimal:2',
         'account_balance' => 'decimal:2',
     ];
+
+    public function scopeActive($query)
+    {
+        return $query->where('status', 'active');
+    }   
+
+    public function scopeByStudent($query, $studentId)
+    {
+        return $query->where('student_id', $studentId);
+    }
+
+    public function scopeBySchoolYear($query, $schoolYear)
+    {
+        return $query->where('school_year', $schoolYear);
+    }
+
+    public function scopeByUserId($query, $userId)
+    {
+        return $query->where('user_id', $userId);
+    }
 }

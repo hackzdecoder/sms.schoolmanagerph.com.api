@@ -26,14 +26,32 @@ interface OtpSessionResponse {
 }
 
 interface OtpViewProps {
-  username: string;
+  username?: string;
   email?: string;
   schoolCode?: string;
-  onOtpVerified?: (token?: string, expiry?: string) => void;
+  onOtpVerified?: (token?: string, expiry?: string, resetToken?: string) => void;
 }
 
-export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewProps) {
+export function OtpView({
+  username: propUsername,
+  email,
+  schoolCode: propSchoolCode,
+  onOtpVerified,
+}: OtpViewProps) {
   const router = useRouter();
+
+  // CRITICAL: Use props if provided, otherwise fallback to localStorage
+  const username =
+    propUsername ||
+    localStorage.getItem('otp_username') ||
+    sessionStorage.getItem('otpUsername') ||
+    '';
+  const schoolCode =
+    propSchoolCode ||
+    localStorage.getItem('otp_school_code') ||
+    sessionStorage.getItem('schoolCode') ||
+    '';
+
   const [otp, setOtp] = useState<string[]>(Array(6).fill(''));
   const [error, setError] = useState<string>('');
   const [touched, setTouched] = useState<boolean>(false);
@@ -65,6 +83,7 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     return Math.max(0, Math.ceil(diff / 1000));
   }, []);
 
+  // ✅ SINGLE useEffect for fetching OTP session (removed duplicate)
   useEffect(() => {
     const fetchOtpSession = async () => {
       try {
@@ -100,13 +119,25 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
       }
     };
 
-    if (username) fetchOtpSession();
-    else {
+    if (username) {
+      // 🔥 Clear first-user data AND user object for password reset flow
+      if (!email) {
+        localStorage.removeItem('first_user_username');
+        localStorage.removeItem('first_user_fullname');
+        localStorage.removeItem('first_user_otp_verified');
+        localStorage.removeItem('first_user_email');
+        localStorage.removeItem('first_user_token');
+        localStorage.removeItem('first_user_token_expiry_at');
+        localStorage.removeItem('user');
+      }
+
+      fetchOtpSession();
+    } else {
       setCheckingSession(false);
       setOtpExpired(true);
       setShowInvalidAccessDialog(true);
     }
-  }, [username, schoolCode, parseMySQLDateTime, calculateRemainingSeconds]);
+  }, [username, schoolCode, email, parseMySQLDateTime, calculateRemainingSeconds]);
 
   useEffect(() => {
     if (!otpExpiryTime || otpExpired || remainingSeconds <= 0) {
@@ -137,62 +168,22 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     }, 1000);
 
     countdownTimerRef.current = timer;
-  }, [otpExpiryTime, otpExpired, remainingSeconds]);
 
-  useEffect(() => {
-    if (!otpExpired && !checkingSession) {
-      inputRefs.current[0]?.focus();
-    }
-  }, [otpExpired, checkingSession]);
-
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>;
-    if (resendCountdown > 0) {
-      timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000);
-    }
-    return () => clearTimeout(timer);
-  }, [resendCountdown]);
-
-  // Single cleanup effect for all timers
-  useEffect(() => {
-    if (!otpExpiryTime || otpExpired || remainingSeconds <= 0) {
+    // eslint-disable-next-line consistent-return
+    return () => {
       if (countdownTimerRef.current) {
         clearInterval(countdownTimerRef.current);
         countdownTimerRef.current = null;
       }
-      return;
-    }
-
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-    }
-
-    const timer = setInterval(() => {
-      setRemainingSeconds((prev) => {
-        if (prev <= 1) {
-          if (countdownTimerRef.current) {
-            clearInterval(countdownTimerRef.current);
-            countdownTimerRef.current = null;
-          }
-          setOtpExpired(true);
-          setShowInvalidAccessDialog(true);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-
-    countdownTimerRef.current = timer;
+    };
   }, [otpExpiryTime, otpExpired, remainingSeconds]);
 
-  // Focus input
   useEffect(() => {
     if (!otpExpired && !checkingSession) {
       inputRefs.current[0]?.focus();
     }
   }, [otpExpired, checkingSession]);
 
-  // Resend countdown
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;
     if (resendCountdown > 0) {
@@ -201,7 +192,6 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     return () => clearTimeout(timer);
   }, [resendCountdown]);
 
-  // Cleanup all timers - FIXED with implicit return
   useEffect(
     () => () => {
       if (redirectTimerRef.current) {
@@ -273,9 +263,11 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
       const requestBody: Record<string, string> = {
         otp_code: otp.join(''),
         username,
+        school_code: schoolCode || '',
       };
-      if (schoolCode) {
-        requestBody.school_code = schoolCode;
+
+      if (email) {
+        requestBody.email = email;
       }
 
       const response = (await api.post('/verify-otp', requestBody, {
@@ -297,20 +289,47 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
           if (onOtpVerified) {
             onOtpVerified(firstUserToken, firstUserTokenExpiryAt);
           }
+          setShowSuccessDialog(true);
+          setLoading(false);
+          return;
         } else if (passwordResetToken) {
-          setResetToken(passwordResetToken);
-          setSuccessDialogMessage(
-            'OTP verification was successful! You can now reset your password.',
-          );
-          if (onOtpVerified) {
-            onOtpVerified();
-          }
-        }
+          // Password reset flow - clear all data
+          localStorage.removeItem('otp_username');
+          localStorage.removeItem('otp_school_code');
+          sessionStorage.removeItem('otpUsername');
+          sessionStorage.removeItem('schoolCode');
 
-        setShowSuccessDialog(true);
+          localStorage.removeItem('first_user_username');
+          localStorage.removeItem('first_user_fullname');
+          localStorage.removeItem('first_user_otp_verified');
+          localStorage.removeItem('first_user_email');
+          localStorage.removeItem('first_user_token');
+          localStorage.removeItem('first_user_token_expiry_at');
+          localStorage.removeItem('user');
+
+          setResetToken(passwordResetToken);
+
+          if (onOtpVerified) {
+            onOtpVerified(undefined, undefined, passwordResetToken);
+            setLoading(false);
+            return;
+          } else {
+            setLoading(false);
+            router.push(
+              `/password-reset?token=${passwordResetToken}&username=${encodeURIComponent(username)}&level=1&school_code=${encodeURIComponent(schoolCode || '')}`,
+            );
+            return;
+          }
+        } else {
+          setError('Verification failed. No token received.');
+          clearOtpFields();
+          setLoading(false);
+          return;
+        }
       } else {
         setError(res.message ?? 'Verification failed.');
         clearOtpFields();
+        setLoading(false);
       }
     } catch (err: unknown) {
       const errorObj = err as {
@@ -327,6 +346,8 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
       } else if (errorObj?.response?.status === 410) {
         errorMessage = 'OTP has expired. Please request a new one.';
         setOtpExpired(true);
+      } else if (errorObj?.response?.status === 422) {
+        errorMessage = 'Validation failed. Please go back and try again.';
       }
 
       setError(errorMessage);
@@ -334,7 +355,17 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     } finally {
       setLoading(false);
     }
-  }, [otp, username, schoolCode, validateOtp, otpExpired, clearOtpFields, onOtpVerified]);
+  }, [
+    otp,
+    username,
+    email,
+    schoolCode,
+    validateOtp,
+    otpExpired,
+    clearOtpFields,
+    onOtpVerified,
+    router,
+  ]);
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -441,14 +472,30 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
     setShowSuccessDialog(false);
 
     if (resetToken && username) {
+      localStorage.removeItem('otp_username');
+      localStorage.removeItem('otp_school_code');
+      sessionStorage.removeItem('otpUsername');
+      sessionStorage.removeItem('schoolCode');
+
+      localStorage.removeItem('first_user_username');
+      localStorage.removeItem('first_user_fullname');
+      localStorage.removeItem('first_user_otp_verified');
+      localStorage.removeItem('first_user_email');
+      localStorage.removeItem('first_user_token');
+      localStorage.removeItem('first_user_token_expiry_at');
+      localStorage.removeItem('user');
+
       router.push(
         `/password-reset?token=${resetToken}&username=${encodeURIComponent(username)}&level=1`,
       );
-    } else if (onOtpVerified) {
-      // First-user flow - callback already called
-    } else {
-      router.push('/login');
+      return;
     }
+
+    if (onOtpVerified) {
+      return;
+    }
+
+    router.push('/login');
   }, [resetToken, username, onOtpVerified, router]);
 
   const handleInvalidAccessClose = useCallback((): void => {
@@ -733,7 +780,11 @@ export function OtpView({ username, email, schoolCode, onOtpVerified }: OtpViewP
             sx={{ py: 1.1, borderRadius: 2, fontWeight: 600 }}
             onClick={handleSuccessClose}
           >
-            {onOtpVerified ? 'Continue to Registration' : 'Continue to Password Reset'}
+            {resetToken
+              ? 'Continue to Password Reset'
+              : onOtpVerified
+                ? 'Continue to Registration'
+                : 'Continue to Password Reset'}
           </Button>
         </Box>
       </Dialog>

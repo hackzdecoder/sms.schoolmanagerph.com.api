@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Label } from 'src/components/label';
 import { SvgColor } from 'src/components/svg-color';
-import { useNavigate } from 'react-router-dom';
 import { api } from 'src/routes/api/config';
 
 const icon = (name: string) => <SvgColor src={`/assets/icons/navbar/${name}.svg`} />;
@@ -44,11 +44,22 @@ export const useNavData = (): NavItem[] => {
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
-  const logout = () => {
+  const logout = useCallback(() => {
+    // Clear ALL localStorage data including user
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    localStorage.removeItem('user_school_code');
+    localStorage.removeItem('otp_username');
+    localStorage.removeItem('otp_school_code');
+    localStorage.removeItem('first_user_username');
+    localStorage.removeItem('first_user_fullname');
+    localStorage.removeItem('first_user_otp_verified');
+    localStorage.removeItem('first_user_email');
+    localStorage.removeItem('first_user_token');
+    localStorage.removeItem('first_user_token_expiry_at');
     sessionStorage.clear();
     navigate('/login', { replace: true });
-  };
+  }, [navigate]);
 
   const fetchUnreadCount = async () => {
     try {
@@ -71,7 +82,7 @@ export const useNavData = (): NavItem[] => {
           setUnreadCount(response.data.data.unread_count);
           return; // Success, exit early
         }
-      } catch (unreadCountError) {
+      } catch {
         console.log('Unread-count endpoint not available, falling back to messages endpoint');
       }
 
@@ -83,7 +94,7 @@ export const useNavData = (): NavItem[] => {
       if (response.data.success && response.data.data) {
         // Filter only unread messages on the frontend
         const unreadMessages = response.data.data.filter(
-          (msg) => msg.status.toLowerCase() === 'unread'
+          (msg) => msg.status.toLowerCase() === 'unread',
         );
         setUnreadCount(unreadMessages.length);
       } else {
@@ -116,6 +127,6 @@ export const useNavData = (): NavItem[] => {
       { title: 'Profile', path: '/profile', icon: icon('ic-profile') },
       { title: 'Logout', icon: icon('ic-power-off'), action: logout },
     ],
-    [unreadCount, logout]
+    [unreadCount, logout],
   );
 };

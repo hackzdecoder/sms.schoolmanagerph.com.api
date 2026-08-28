@@ -16,7 +16,7 @@ return new class extends Migration
             $table->id();
             
             // User and school identification
-            $table->string('userid', 20)->nullable();
+            $table->string('user_id', 20)->nullable();
             $table->string('school_code', 20)->nullable();
             
             // Student information
@@ -46,7 +46,7 @@ return new class extends Migration
             // ============================================================
             // INDEXES
             // ============================================================
-            $table->index('userid');
+            $table->index('user_id');
             $table->index('student_id');
             $table->index('school_code');
             $table->index('school_year');
