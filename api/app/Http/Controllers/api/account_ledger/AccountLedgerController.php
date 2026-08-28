@@ -75,17 +75,16 @@ class AccountLedgerController extends Controller
                 ->where('student_id', $studentId)
                 ->first();
 
-            // Get address from student_id_info table in IDRS database
-            $idrsDatabase = env('DB_SCHOOLS_DATABASE_DEV', 'idrs_school_db');
-            $studentIdInfo = DB::connection('users_main')
-                ->table($idrsDatabase . '.student_id_info')
+            // Get address from student_id_info table using the idrs_school connection
+            $studentIdInfo = DB::connection('idrs_school')
+                ->table('student_id_info')
                 ->where('school_code', $schoolCode)
                 ->where('student_id', $studentId)
                 ->first();
 
             if (!$studentIdInfo) {
-                $studentIdInfo = DB::connection('users_main')
-                    ->table($idrsDatabase . '.student_id_info')
+                $studentIdInfo = DB::connection('idrs_school')
+                    ->table('student_id_info')
                     ->where('student_id', $studentId)
                     ->first();
             }
