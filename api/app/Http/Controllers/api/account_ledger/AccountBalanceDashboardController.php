@@ -13,6 +13,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class AccountBalanceDashboardController extends Controller
 {
@@ -261,10 +262,12 @@ class AccountBalanceDashboardController extends Controller
 
     private function getStudentId($user, Request $request, string $schoolCode): ?string
     {
+        // If student_id is passed in request, use it
         if ($request->has('student_id')) {
             return $request->get('student_id');
         }
 
+        // If user object has student_id, use it
         if (isset($user->student_id) && $user->student_id) {
             return $user->student_id;
         }
@@ -273,18 +276,74 @@ class AccountBalanceDashboardController extends Controller
             $databaseName = DatabaseManager::generateDatabaseName($schoolCode);
             DatabaseManager::connect($databaseName);
             
+            // Try to find by user_id with school_code match (most specific)
             $studentRecord = DB::connection($databaseName)
                 ->table('student_records')
                 ->where('school_code', $schoolCode)
                 ->where('user_id', $user->user_id)
-                ->orWhere('email', $user->email)
                 ->first();
 
-            if ($studentRecord) {
-                return $studentRecord->student_id ?? $studentRecord->id ?? null;
+            if ($studentRecord && isset($studentRecord->student_id)) {
+                return $studentRecord->student_id;
             }
+
+            // If not found, try by email with school_code
+            if (isset($user->email) && $user->email) {
+                $studentRecord = DB::connection($databaseName)
+                    ->table('student_records')
+                    ->where('school_code', $schoolCode)
+                    ->where('email', $user->email)
+                    ->first();
+
+                if ($studentRecord && isset($studentRecord->student_id)) {
+                    return $studentRecord->student_id;
+                }
+            }
+
+            // Try by mobile_number with school_code
+            if (isset($user->user_id) && $user->user_id) {
+                $studentRecord = DB::connection($databaseName)
+                    ->table('student_records')
+                    ->where('school_code', $schoolCode)
+                    ->where('mobile_number', $user->user_id)
+                    ->first();
+
+                if ($studentRecord && isset($studentRecord->student_id)) {
+                    return $studentRecord->student_id;
+                }
+            }
+
+            // Try by user_id without school_code (fallback)
+            $studentRecord = DB::connection($databaseName)
+                ->table('student_records')
+                ->where('user_id', $user->user_id)
+                ->first();
+
+            if ($studentRecord && isset($studentRecord->student_id)) {
+                return $studentRecord->student_id;
+            }
+
+            // Try by email without school_code (fallback)
+            if (isset($user->email) && $user->email) {
+                $studentRecord = DB::connection($databaseName)
+                    ->table('student_records')
+                    ->where('email', $user->email)
+                    ->first();
+
+                if ($studentRecord && isset($studentRecord->student_id)) {
+                    return $studentRecord->student_id;
+                }
+            }
+
+            // Log that we couldn't find the student
+            Log::warning('Student record not found in getStudentId', [
+                'user_id' => $user->user_id ?? 'null',
+                'email' => $user->email ?? 'null',
+                'school_code' => $schoolCode,
+            ]);
+
         } catch (\Exception $e) {
-            // Silent fail
+            Log::error('Error in getStudentId: ' . $e->getMessage());
         }
 
         return null;
