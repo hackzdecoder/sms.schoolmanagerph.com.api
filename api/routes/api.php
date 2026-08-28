@@ -55,6 +55,10 @@ Route::post('/trademarks', [TrademarksController::class, 'getTrademarksInfo']);
 
 Route::get('/school-identification', [SchoolController::class, 'getSchool']);
 
+Route::post('/test', function () {
+  return ['data'];
+});
+
 // ----------------------------
 // PROTECTED ROUTES
 // ----------------------------
