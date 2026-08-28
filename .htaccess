@@ -6,17 +6,6 @@
 
 RewriteEngine On
 
-# ============================================================
-# BACKEND (Laravel API) ROUTING - MUST BE FIRST!
-# ============================================================
-
-# Redirect all /api/* requests to the backend
-RewriteRule ^api/(.*)$ /api/public/index.php/$1 [L]
-
-# ============================================================
-# FRONTEND RULES (After API)
-# ============================================================
-
 # If the request is for a file that exists in /app/dist, serve it from /app/dist
 RewriteCond %{DOCUMENT_ROOT}/app/dist%{REQUEST_URI} -f
 RewriteRule ^(.*)$ /app/dist/$1 [L]
@@ -29,3 +18,15 @@ RewriteRule ^(.*)$ /app/dist/$1 [L]
 RewriteCond %{REQUEST_FILENAME} !-f
 RewriteCond %{REQUEST_FILENAME} !-d
 RewriteRule ^ /app/dist/index.html [L]
+
+
+
+# ============================================================
+# BACKEND (Laravel API) ROUTING
+# ============================================================
+
+# Redirect all /api/* requests to the backend
+RewriteRule ^api/(.*)$ /api/public/index.php/$1 [L]
+
+# OR if your backend is in a different folder, use this:
+# RewriteRule ^api/(.*)$ /backend/public/index.php/$1 [L]
