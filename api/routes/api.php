@@ -63,17 +63,17 @@ Route::get('/test-public', function () {
     return ['message' => 'Public route works!'];
 });
 
-Route::get('/test-user', function () {
-    $user = App\Models\User::where('user_id', '09459759771')->first();
-    return response()->json([
-        'user' => $user ? [
-            'id' => $user->id,
-            'user_id' => $user->user_id,
-            'school_code' => $user->school_code,
-            'fullname' => $user->fullname,
-        ] : null
-    ]);
-});
+// Route::get('/test-user', function () {
+//     $user = App\Models\User::where('user_id', '09459759771')->first();
+//     return response()->json([
+//         'user' => $user ? [
+//             'id' => $user->id,
+//             'user_id' => $user->user_id,
+//             'school_code' => $user->school_code,
+//             'fullname' => $user->fullname,
+//         ] : null
+//     ]);
+// });
 // ============================================================
 
 // ----------------------------
