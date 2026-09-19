@@ -5,6 +5,8 @@ namespace App\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use App\Helpers\DatabaseManager;
 
 class MigrateNotificationsToSchoolDb extends Command
@@ -18,7 +20,7 @@ class MigrateNotificationsToSchoolDb extends Command
     /**
      * The console command description.
      */
-    protected $description = 'One-time migration: copy push_devices and notification_logs from users_main into each school\'s own dynamic database';
+    protected $description = 'One-time migration: create push_devices/notification_logs tables in each school DB (if missing) and copy data from users_main';
 
     public function handle()
     {
@@ -31,16 +33,16 @@ class MigrateNotificationsToSchoolDb extends Command
         $this->info('Starting migration of push_devices and notification_logs to school databases...');
         $this->newLine();
 
-        // ── Step 1: Get all distinct school codes from users_main.push_devices ──
+        // Get all distinct school codes from users_main.users
         $schoolCodes = DB::connection('users_main')
-            ->table('push_devices')
+            ->table('users')
             ->whereNotNull('school_code')
             ->where('school_code', '!=', '')
             ->distinct()
             ->pluck('school_code');
 
         if ($schoolCodes->isEmpty()) {
-            $this->info('No push_devices found in users_main. Nothing to migrate.');
+            $this->info('No school codes found in users_main.users. Nothing to migrate.');
             return 0;
         }
 
@@ -52,9 +54,55 @@ class MigrateNotificationsToSchoolDb extends Command
 
             try {
                 // Connect to the school's dynamic database
-                $schoolDb = DatabaseManager::connectBySchoolCode($schoolCode);
+                $databaseName = DatabaseManager::generateDatabaseName($schoolCode);
+                $schoolDb     = DatabaseManager::connect($databaseName);
 
-                // ── Migrate push_devices ──
+                // ── STEP 1: Create push_devices table if it doesn't exist ──
+                if (!$schoolDb->getSchemaBuilder()->hasTable('push_devices')) {
+                    $this->line("  push_devices table missing — creating...");
+                    if (!$isDryRun) {
+                        $schoolDb->getSchemaBuilder()->create('push_devices', function (Blueprint $table) {
+                            $table->id();
+                            $table->string('user_id')->index();
+                            $table->string('school_code')->index()->nullable();
+                            $table->string('player_id')->index();
+                            $table->string('platform')->default('web');
+                            $table->boolean('is_active')->default(true);
+                            $table->timestamps();
+                        });
+                        $this->line("  push_devices table created ✅");
+                    } else {
+                        $this->line("  [dry-run] push_devices table would be created");
+                    }
+                } else {
+                    $this->line("  push_devices table already exists ✅");
+                }
+
+                // ── STEP 2: Create notification_logs table if it doesn't exist ──
+                if (!$schoolDb->getSchemaBuilder()->hasTable('notification_logs')) {
+                    $this->line("  notification_logs table missing — creating...");
+                    if (!$isDryRun) {
+                        $schoolDb->getSchemaBuilder()->create('notification_logs', function (Blueprint $table) {
+                            $table->id();
+                            $table->string('user_id')->index();
+                            $table->string('school_code')->index();
+                            $table->string('record_type')->index(); // 'attendance' or 'message'
+                            $table->unsignedBigInteger('record_id');
+                            $table->boolean('sent_successfully')->default(false);
+                            $table->timestamp('notified_at')->useCurrent();
+                            $table->timestamps();
+
+                            $table->unique(['user_id', 'school_code', 'record_type', 'record_id'], 'unique_notification');
+                        });
+                        $this->line("  notification_logs table created ✅");
+                    } else {
+                        $this->line("  [dry-run] notification_logs table would be created");
+                    }
+                } else {
+                    $this->line("  notification_logs table already exists ✅");
+                }
+
+                // ── STEP 3: Migrate push_devices data from users_main ──
                 $devices = DB::connection('users_main')
                     ->table('push_devices')
                     ->where('school_code', $schoolCode)
@@ -64,7 +112,6 @@ class MigrateNotificationsToSchoolDb extends Command
                 $deviceSkipped  = 0;
 
                 foreach ($devices as $device) {
-                    // Skip if already exists in school DB (by player_id to avoid duplicates)
                     $exists = $schoolDb->table('push_devices')
                         ->where('player_id', $device->player_id)
                         ->exists();
@@ -88,9 +135,9 @@ class MigrateNotificationsToSchoolDb extends Command
                     $deviceInserted++;
                 }
 
-                $this->line("  push_devices   → inserted: {$deviceInserted}, skipped (already exists): {$deviceSkipped}");
+                $this->line("  push_devices   → inserted: {$deviceInserted}, skipped: {$deviceSkipped}");
 
-                // ── Migrate notification_logs ──
+                // ── STEP 4: Migrate notification_logs data from users_main ──
                 $logs = DB::connection('users_main')
                     ->table('notification_logs')
                     ->where('school_code', $schoolCode)
@@ -100,12 +147,11 @@ class MigrateNotificationsToSchoolDb extends Command
                 $logSkipped  = 0;
 
                 foreach ($logs as $log) {
-                    // Skip if already exists (composite unique: user_id + school_code + record_type + record_id)
                     $exists = $schoolDb->table('notification_logs')
-                        ->where('user_id',      $log->user_id)
-                        ->where('school_code',  $log->school_code)
-                        ->where('record_type',  $log->record_type)
-                        ->where('record_id',    $log->record_id)
+                        ->where('user_id',     $log->user_id)
+                        ->where('school_code', $log->school_code)
+                        ->where('record_type', $log->record_type)
+                        ->where('record_id',   $log->record_id)
                         ->exists();
 
                     if ($exists) {
@@ -128,7 +174,7 @@ class MigrateNotificationsToSchoolDb extends Command
                     $logInserted++;
                 }
 
-                $this->line("  notification_logs → inserted: {$logInserted}, skipped (already exists): {$logSkipped}");
+                $this->line("  notification_logs → inserted: {$logInserted}, skipped: {$logSkipped}");
 
             } catch (\Exception $e) {
                 $this->error("  ERROR for school {$schoolCode}: " . $e->getMessage());
